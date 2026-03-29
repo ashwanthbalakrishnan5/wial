@@ -171,6 +171,49 @@ We separated AI editing from normal deployment because it has a different contro
 
 ---
 
+## Accessibility
+
+Accessibility was treated as part of the platform design, not a final pass after the UI was built.
+
+**What users get**
+
+- Public chapter sites support keyboard-first navigation and clearer structure for screen reader users
+- The admin dashboard supports multilingual operation for a global nonprofit team
+- Low-bandwidth users benefit from the static-site architecture and reduced page-weight targets
+
+**How we built it**
+
+- The shared chapter layout includes a real skip link and a `main` landmark so keyboard users can jump directly to content
+- The Astro templates use semantic navigation, labeled sections, `aria-label`, and `aria-required` patterns across navigation, forms, filters, and coach contact actions
+- Focus states are explicitly styled in the chapter templates and admin UI instead of relying on browser defaults
+- The HTML `lang` attribute is set from the active locale in both the chapter sites and the Next.js admin app
+- External links use safe and predictable behavior with `rel="noopener noreferrer"`, and the template includes save-data-aware behavior to reduce unnecessary page weight
+- The shared template approach means accessibility improvements propagate to every provisioned chapter instead of being fixed one site at a time
+
+---
+
+## Security
+
+Security is built around least privilege, scoped automation, and approval gates instead of trusting the client.
+
+**Core protections**
+
+- Authentication runs through Supabase Auth, and sensitive admin flows resolve the current user server-side before any privileged action is taken
+- Authorization is enforced with chapter-aware role checks in the app layer and Row Level Security in Postgres, so chapter data is isolated at the database boundary as well as in the UI
+- Sensitive writes such as payment state updates and some deployment records use backend service-role access only, not direct client writes
+- Stripe webhooks are verified with HMAC-SHA256, timing-safe comparison, and five-minute replay protection before payment records are updated
+- AI editing is operationally sandboxed: the GitHub Actions workflow only permits writes inside `apps/chapter-{slug}/`, rejects out-of-scope diffs, and requires explicit human approval before merge to `main`
+- Deployment safety includes one active AI session per chapter, validation that the AI branch matches the chapter slug, and explicit approve/reject controls before production release
+- The Supabase function deployment workflow separates public and protected functions, and protected functions keep JWT verification enabled by default
+
+**Why this matters**
+
+- Chapter leads can manage their own chapter without gaining access to global data
+- Payment and webhook logic cannot be spoofed by a browser-only caller
+- AI assistance remains useful without being allowed to silently ship arbitrary code to production
+
+---
+
 ## Architecture
 
 ```text
