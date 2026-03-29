@@ -1,0 +1,31 @@
+---
+import { getChapterData } from "@repo/template-core/lib/data";
+import { generateCoachSlug } from "@repo/template-core/lib/utils";
+import type { Tables } from "@repo/types";
+
+export async function getStaticPaths() {
+  const chapterSlug = import.meta.env.CHAPTER_SLUG;
+  const { coaches } = await getChapterData(chapterSlug);
+  return coaches.map((coach) => ({
+    params: { slug: generateCoachSlug(coach.id, coach.full_name) },
+  }));
+}
+
+const chapterSlug = import.meta.env.CHAPTER_SLUG;
+const { chapter } = await getChapterData(chapterSlug);
+const defaultLocale = chapter.default_language;
+const { slug } = Astro.params;
+---
+
+<!doctype html>
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <meta http-equiv="refresh" content={`0;url=/${defaultLocale}/coaches/${slug}`} />
+    <link rel="canonical" href={`/${defaultLocale}/coaches/${slug}`} />
+    <title>Redirecting...</title>
+  </head>
+  <body>
+    <p>Redirecting to <a href={`/${defaultLocale}/coaches/${slug}`}>/{defaultLocale}/coaches/{slug}</a>...</p>
+  </body>
+</html>
