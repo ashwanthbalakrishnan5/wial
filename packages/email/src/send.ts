@@ -24,12 +24,13 @@ export interface SendEmailResult {
 export async function sendEmail(
   options: SendEmailOptions
 ): Promise<SendEmailResult> {
+  const denoApiKey =
+    typeof Deno !== "undefined" ? Deno?.env?.get?.("RESEND_API_KEY") : undefined;
+
   const apiKey =
     options.apiKey ||
     (typeof process !== "undefined" ? process.env.RESEND_API_KEY : undefined) ||
-    (typeof Deno !== "undefined"
-      ? (Deno as any).env.get("RESEND_API_KEY")
-      : undefined);
+    denoApiKey;
 
   const to = Array.isArray(options.to) ? options.to : [options.to];
 
@@ -63,5 +64,4 @@ export async function sendEmail(
   return { success: true, id: data.id };
 }
 
-// Deno global type hint to avoid TS error
-declare const Deno: { env: { get(key: string): string | undefined } } | undefined;
+declare const Deno: any;

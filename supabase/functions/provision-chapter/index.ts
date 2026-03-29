@@ -639,36 +639,109 @@ Deno.serve(async (req) => {
     if (ownerId) sourceConfig.owner_id = ownerId;
     if (repoId) sourceConfig.repo_id = repoId;
 
-    const createProjectRes = await fetch(cfBaseUrl, {
-      method: "POST",
-      headers: cfHeaders,
-      body: JSON.stringify({
-        name: projectName,
-        production_branch: "main",
-        build_config: {
-          build_command: `cd ${chapterFolder} && npm install && npx astro build`,
-          destination_dir: `${chapterFolder}/dist`,
-          root_dir: "",
-          build_caching: true,
-        },
-        source: {
-          type: "github",
-          config: sourceConfig,
-        },
-        deployment_configs: {
-          production: {
-            env_vars: envVars,
-          },
-          preview: {
-            env_vars: envVars,
-          },
-        },
-      }),
-    });
+    const minimalSourceConfig: Record<string, unknown> = {
+      owner: githubOwner,
+      repo_name: githubRepo,
+      production_branch: "main",
+      deployments_enabled: true,
+      production_deployments_enabled: true,
+      preview_deployment_setting: "all",
+    };
 
-    const createProjectData = (await createProjectRes.json().catch(() => null)) as
-      | CloudflareEnvelope<unknown>
-      | null;
+    const createPayloads: Array<{
+      label: string;
+      payload: Record<string, unknown>;
+    }> = [
+      {
+        label: "full-source-config",
+        payload: {
+          name: projectName,
+          production_branch: "main",
+          build_config: {
+            build_command: `cd ${chapterFolder} && npm install && npx astro build`,
+            destination_dir: `${chapterFolder}/dist`,
+            root_dir: "",
+            build_caching: true,
+          },
+          source: {
+            type: "github",
+            config: sourceConfig,
+          },
+          deployment_configs: {
+            production: {
+              env_vars: envVars,
+            },
+            preview: {
+              env_vars: envVars,
+            },
+          },
+        },
+      },
+      {
+        label: "minimal-source-config",
+        payload: {
+          name: projectName,
+          production_branch: "main",
+          build_config: {
+            build_command: `cd ${chapterFolder} && npm install && npx astro build`,
+            destination_dir: `${chapterFolder}/dist`,
+            root_dir: "",
+          },
+          source: {
+            type: "github",
+            config: minimalSourceConfig,
+          },
+          deployment_configs: {
+            production: {
+              env_vars: envVars,
+            },
+            preview: {
+              env_vars: envVars,
+            },
+          },
+        },
+      },
+    ];
+
+    let createProjectRes: Response | null = null;
+    let createProjectData: CloudflareEnvelope<unknown> | null = null;
+
+    for (const attempt of createPayloads) {
+      const { response, data } = await cloudflareApi(
+        cloudflareApiToken,
+        `/accounts/${cloudflareAccountId}/pages/projects`,
+        {
+          method: "POST",
+          body: JSON.stringify(attempt.payload),
+        }
+      );
+
+      createProjectRes = response;
+      createProjectData = data;
+
+      if (response.ok) {
+        break;
+      }
+
+      const alreadyExists = Array.isArray(data?.errors)
+        ? data.errors
+            .map((err) => (err?.message ?? "").toLowerCase())
+            .some((msg) => msg.includes("already exists"))
+        : false;
+
+      if (alreadyExists) {
+        break;
+      }
+
+      console.error(
+        `Cloudflare project creation attempt failed (${attempt.label})`,
+        JSON.stringify(data)
+      );
+    }
+
+    if (!createProjectRes) {
+      throw new Error("Cloudflare project creation did not execute");
+    }
 
     if (!createProjectRes.ok) {
       const existingProjectMessage = Array.isArray(createProjectData?.errors)
@@ -724,7 +797,39 @@ Deno.serve(async (req) => {
       }
     }
 
-    const watchPathsWarning: string | null = null;
+    // Best-effort watch path setup. Project creation should not fail on this.
+    const watchSourceConfig: Record<string, unknown> = {
+      owner: githubOwner,
+      repo_name: githubRepo,
+      production_branch: "main",
+      pr_comments_enabled: true,
+      deployments_enabled: true,
+      production_deployments_enabled: true,
+      preview_deployment_setting: "all",
+      path_includes: watchPathIncludes,
+      path_excludes: [],
+    };
+    if (ownerId) watchSourceConfig.owner_id = ownerId;
+    if (repoId) watchSourceConfig.repo_id = repoId;
+
+    const { response: updateProjectRes, data: updateProjectData } =
+      await cloudflareApi(
+        cloudflareApiToken,
+        `/accounts/${cloudflareAccountId}/pages/projects/${projectName}`,
+        {
+          method: "PATCH",
+          body: JSON.stringify({
+            source: {
+              type: "github",
+              config: watchSourceConfig,
+            },
+          }),
+        }
+      );
+
+    const watchPathsWarning = !updateProjectRes.ok || !updateProjectData?.success
+      ? `Build watch paths could not be configured: ${updateProjectData?.errors?.[0]?.message || updateProjectRes.status}`
+      : null;
 
     // =======================================================================
     // STEP 3 — Configure custom domain

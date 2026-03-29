@@ -1,5 +1,5 @@
 import { Skeleton } from "@repo/ui/skeleton";
-import { Card, CardContent, CardHeader } from "@repo/ui/card";
+import { Card, CardContent } from "@repo/ui/card";
 
 export default function ChaptersLoading() {
   return (

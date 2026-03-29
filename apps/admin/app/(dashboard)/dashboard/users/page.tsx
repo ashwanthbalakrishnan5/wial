@@ -2,10 +2,6 @@ import { getAuthUser, isSuperAdmin } from "@/lib/auth";
 import { createClient } from "@repo/supabase/server";
 import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
-import {
-  Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
-} from "@repo/ui/table";
-import { Badge } from "@repo/ui/badge";
 import { UserManagementClient } from "./user-management-client";
 
 export default async function UsersPage() {

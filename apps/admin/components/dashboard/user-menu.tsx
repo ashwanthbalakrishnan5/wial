@@ -10,7 +10,6 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@repo/ui/dropdown-menu";
-import { Avatar, AvatarFallback } from "@repo/ui/avatar";
 import { useAuth } from "@/components/providers/auth-provider";
 import { LogOut, User } from "lucide-react";
 import { Badge } from "@repo/ui/badge";

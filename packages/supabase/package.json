@@ -8,7 +8,7 @@
     "./middleware": "./src/middleware.ts"
   },
   "scripts": {
-    "lint": "eslint . --max-warnings 0"
+    "lint": "eslint . --ext .ts,.tsx,.js,.jsx,.mjs,.cjs --max-warnings 0"
   },
   "dependencies": {
     "@repo/types": "*",

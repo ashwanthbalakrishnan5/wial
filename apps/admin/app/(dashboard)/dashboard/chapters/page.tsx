@@ -6,7 +6,6 @@ import { Button } from "@repo/ui/button";
 import {
   Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
 } from "@repo/ui/table";
-import { Badge } from "@repo/ui/badge";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -18,12 +17,6 @@ import {
   Plus, Building2, MoreHorizontal, Eye, Pencil, Rocket, ShieldOff, ShieldCheck, Archive,
 } from "lucide-react";
 import { getTranslations } from "next-intl/server";
-
-const statusVariant: Record<string, "default" | "secondary" | "destructive" | "outline"> = {
-  active: "default",
-  suspended: "destructive",
-  archived: "outline",
-};
 
 function formatRelativeTime(
   dateStr: string,

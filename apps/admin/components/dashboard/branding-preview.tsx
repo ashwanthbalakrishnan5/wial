@@ -24,7 +24,7 @@ export function BrandingPreview({ name, primaryColor, secondaryColor, accentColo
         {/* Mock Header */}
         <div className="h-12 border-b flex items-center justify-between px-4 bg-white shrink-0">
           <div className="font-bold text-sm truncate max-w-[120px]" style={{ color: primaryColor }}>{name}</div>
-          <div className="flex gap-2 text-[10px] text-slate-500 font-sans">
+          <div className="flex gap-2 text-[10px] font-sans" style={{ color: secondaryColor }}>
             <span className="hidden sm:inline">{t("home")}</span>
             <span className="hidden sm:inline">{t("about")}</span>
             <span style={{ color: primaryColor, borderBottom: `2px solid ${accentColor}` }} className="font-medium pb-0.5">{t("coachesCount")}</span>
