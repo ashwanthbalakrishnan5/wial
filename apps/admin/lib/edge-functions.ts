@@ -35,10 +35,44 @@ export async function invokeEdgeFunctionWithAuth<TData = any>(
     };
   }
 
-  return supabase.functions.invoke<TData>(functionName, {
-    body,
+  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
+  const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+
+  if (!supabaseUrl || !supabaseAnonKey) {
+    return {
+      data: null,
+      error: new Error("Supabase client configuration is missing."),
+    };
+  }
+
+  const endpoint = `${supabaseUrl}/functions/v1/${functionName}`;
+
+  const response = await fetch(endpoint, {
+    method: "POST",
     headers: {
+      "Content-Type": "application/json",
+      apikey: supabaseAnonKey,
       Authorization: `Bearer ${accessToken}`,
     },
+    body: JSON.stringify(body ?? {}),
   });
+
+  const responseData = await response.json().catch(() => null);
+
+  if (!response.ok) {
+    const errorMessage =
+      responseData?.error ??
+      responseData?.errors?.[0]?.message ??
+      `Function ${functionName} failed with status ${response.status}`;
+
+    return {
+      data: null,
+      error: new Error(errorMessage),
+    };
+  }
+
+  return {
+    data: responseData as TData,
+    error: null,
+  };
 }
