@@ -1,0 +1,86 @@
+---
+import BaseLayout from "@repo/template-core/layouts/BaseLayout.astro";
+import { getChapterData } from "@repo/template-core/lib/data";
+import { getBlock, getJsonBlock } from "@repo/template-core/lib/content";
+
+export async function getStaticPaths() {
+  const slug = import.meta.env.CHAPTER_SLUG;
+  const { chapter } = await getChapterData(slug);
+  return chapter.active_languages.map((lang: string) => ({
+    params: { locale: lang },
+  }));
+}
+
+const { locale } = Astro.params;
+const slug = import.meta.env.CHAPTER_SLUG;
+const { contentBlocks } = await getChapterData(slug, locale);
+
+const title = getBlock(contentBlocks, "join_title", "Join Us");
+const description = getBlock(contentBlocks, "join_description", "");
+const benefitsRaw = getBlock(contentBlocks, "join_benefits", "");
+const ctaText = getBlock(contentBlocks, "join_cta_text", "Get Started");
+const ctaLink = getBlock(contentBlocks, "join_cta_link", `/${locale}/contact`);
+
+let benefitsList: string[] = [];
+try {
+  const parsed = JSON.parse(benefitsRaw);
+  if (Array.isArray(parsed)) benefitsList = parsed;
+} catch {
+  // Not JSON — render as rich text below
+}
+---
+
+<BaseLayout title="Join" locale={locale}>
+  {/* Page Hero */}
+  <section class="relative overflow-hidden py-16 md:py-24">
+    <div class="absolute inset-0" style="background: linear-gradient(135deg, var(--color-brand-primary-light) 0%, var(--color-warm-ivory) 60%, var(--color-brand-accent-light) 100%)"></div>
+    <div class="relative z-10 mx-auto max-w-[1200px] px-4 sm:px-6 text-center">
+      <p class="overline text-brand-accent mb-3">Membership</p>
+      <h1 class="text-4xl md:text-5xl lg:text-[3.5rem] font-bold font-heading tracking-tight mx-auto max-w-3xl" style="color:var(--color-brand-primary)">
+        {title}
+      </h1>
+      {description && (
+        <div class="text-lg text-text-secondary mt-4 max-w-2xl mx-auto prose" set:html={description} />
+      )}
+    </div>
+    <div class="absolute bottom-0 left-0 right-0">
+      <svg viewBox="0 0 1440 48" preserveAspectRatio="none" class="w-full h-8 md:h-12" fill="var(--color-warm-ivory)">
+        <path d="M0,24 C360,48 1080,0 1440,28 L1440,48 L0,48 Z"/>
+      </svg>
+    </div>
+  </section>
+
+  <section class="py-12 md:py-16">
+    <div class="mx-auto max-w-[1200px] px-4 sm:px-6">
+      {benefitsList.length > 0 ? (
+        <div class="max-w-2xl mx-auto space-y-3 mb-12">
+          {benefitsList.map((benefit) => (
+            <div class="flex items-start gap-3 p-4 rounded-xl bg-surface-muted border border-border-subtle">
+              <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="var(--color-brand-accent)" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" class="mt-0.5 flex-shrink-0"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><path d="m9 11 3 3L22 4"/></svg>
+              <p class="text-text-primary">{benefit}</p>
+            </div>
+          ))}
+        </div>
+      ) : benefitsRaw ? (
+        <div class="max-w-[42rem] mx-auto prose mb-12" set:html={benefitsRaw} />
+      ) : null}
+
+      <div class="relative max-w-2xl mx-auto rounded-2xl p-10 md:p-12 text-center text-white overflow-hidden">
+        <div class="absolute inset-0" style="background: linear-gradient(135deg, var(--color-brand-primary), var(--color-brand-secondary))"></div>
+        <div class="absolute inset-0 opacity-[0.04]" style="background-image: url(&quot;data:image/svg+xml,%3Csvg width='60' height='60' viewBox='0 0 60 60' xmlns='http://www.w3.org/2000/svg'%3E%3Cg fill='none' fill-rule='evenodd'%3E%3Cg fill='%23ffffff' fill-opacity='1'%3E%3Cpath d='M36 34v-4h-2v4h-4v2h4v4h2v-4h4v-2h-4zm0-30V0h-2v4h-4v2h4v4h2V6h4V4h-4zM6 34v-4H4v4H0v2h4v4h2v-4h4v-2H6zM6 4V0H4v4H0v2h4v4h2V6h4V4H6z'/%3E%3C/g%3E%3C/g%3E%3C/svg%3E&quot;)"></div>
+        <div class="relative z-10">
+          <h2 class="text-3xl font-bold font-heading mb-3">Ready to Join?</h2>
+          <p class="text-white/80 mb-8">Take the next step in your Action Learning journey.</p>
+          <a
+            href={ctaLink}
+            class="inline-flex items-center gap-2 px-8 py-3.5 text-base font-semibold rounded-full bg-white shadow-lg hover:shadow-xl hover:-translate-y-0.5 transition-all duration-200"
+            style="color:var(--color-brand-primary)"
+          >
+            {ctaText}
+            <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14"/><path d="m12 5 7 7-7 7"/></svg>
+          </a>
+        </div>
+      </div>
+    </div>
+  </section>
+</BaseLayout>
