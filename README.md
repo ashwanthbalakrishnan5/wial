@@ -21,7 +21,6 @@ Brief description of your project and its goals.
 - Backend:
 - Database:
 - APIs:
-<!-- Add/modify as needed -->
 
 ## Getting Started
 
