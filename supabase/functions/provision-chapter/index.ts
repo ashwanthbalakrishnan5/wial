@@ -915,9 +915,146 @@ Deno.serve(async (req) => {
     }
 
     // =======================================================================
-    // STEP 5 — No deploy hook trigger needed.
-    // The merge to main triggers Cloudflare auto-deploy via GitHub integration.
+    // STEP 5 — Trigger initial deployment after Cloudflare project creation.
+    // The scaffold merge happened before the Pages project existed, so it may
+    // not trigger the first deployment. Push a lightweight trigger commit.
     // =======================================================================
+
+    let initialDeployWarning: string | null = null;
+    let initialDeployCommitSha: string | null = null;
+
+    try {
+      const triggerPath = `${chapterFolder}/.deploy-trigger`;
+
+      const refRes = await githubApi(githubToken, `${repoPath}/git/ref/heads/main`);
+      if (!refRes.ok) {
+        throw new Error("Failed to read main branch ref for initial deployment trigger");
+      }
+      const refData = await refRes.json();
+      const mainHeadSha: string = refData.object.sha;
+
+      const commitRes = await githubApi(
+        githubToken,
+        `${repoPath}/git/commits/${mainHeadSha}`
+      );
+      if (!commitRes.ok) {
+        throw new Error("Failed to read main branch commit for initial deployment trigger");
+      }
+      const commitData = await commitRes.json();
+      const baseTreeSha: string = commitData.tree.sha;
+
+      const blobRes = await githubApi(
+        githubToken,
+        `${repoPath}/git/blobs`,
+        {
+          method: "POST",
+          body: JSON.stringify({
+            content: `Initial deployment trigger for ${slug} at ${new Date().toISOString()}`,
+            encoding: "utf-8",
+          }),
+        }
+      );
+      if (!blobRes.ok) {
+        throw new Error("Failed to create deployment trigger blob");
+      }
+      const blobData = await blobRes.json();
+
+      const treeRes = await githubApi(
+        githubToken,
+        `${repoPath}/git/trees`,
+        {
+          method: "POST",
+          body: JSON.stringify({
+            base_tree: baseTreeSha,
+            tree: [
+              {
+                path: triggerPath,
+                mode: "100644",
+                type: "blob",
+                sha: blobData.sha,
+              },
+            ],
+          }),
+        }
+      );
+      if (!treeRes.ok) {
+        throw new Error("Failed to create deployment trigger tree");
+      }
+      const treeData = await treeRes.json();
+
+      const triggerBranch = `provision/${slug}-deploy-trigger-${Date.now().toString(36)}`;
+
+      const createBranchRes = await githubApi(
+        githubToken,
+        `${repoPath}/git/refs`,
+        {
+          method: "POST",
+          body: JSON.stringify({
+            ref: `refs/heads/${triggerBranch}`,
+            sha: mainHeadSha,
+          }),
+        }
+      );
+      if (!createBranchRes.ok) {
+        throw new Error("Failed to create branch for initial deployment trigger");
+      }
+
+      const newCommitRes = await githubApi(
+        githubToken,
+        `${repoPath}/git/commits`,
+        {
+          method: "POST",
+          body: JSON.stringify({
+            message: `chore: trigger initial deploy for chapter ${slug}`,
+            tree: treeData.sha,
+            parents: [mainHeadSha],
+          }),
+        }
+      );
+      if (!newCommitRes.ok) {
+        throw new Error("Failed to create initial deployment trigger commit");
+      }
+      const newCommitData = await newCommitRes.json();
+      initialDeployCommitSha = newCommitData.sha;
+
+      const updateBranchRes = await githubApi(
+        githubToken,
+        `${repoPath}/git/refs/heads/${triggerBranch}`,
+        {
+          method: "PATCH",
+          body: JSON.stringify({ sha: newCommitData.sha }),
+        }
+      );
+      if (!updateBranchRes.ok) {
+        throw new Error("Failed to update initial deployment trigger branch");
+      }
+
+      const mergeTriggerRes = await githubApi(
+        githubToken,
+        `${repoPath}/merges`,
+        {
+          method: "POST",
+          body: JSON.stringify({
+            base: "main",
+            head: triggerBranch,
+            commit_message: `chore: trigger initial deploy for chapter ${slug}`,
+          }),
+        }
+      );
+      if (!mergeTriggerRes.ok) {
+        throw new Error("Failed to merge initial deployment trigger branch");
+      }
+
+      await githubApi(
+        githubToken,
+        `${repoPath}/git/refs/heads/${triggerBranch}`,
+        { method: "DELETE" }
+      );
+    } catch (error) {
+      initialDeployWarning =
+        (error as Error).message ||
+        "Initial deployment trigger commit failed; push another commit to start deployment.";
+    }
 
     return new Response(
       JSON.stringify({
@@ -929,6 +1066,8 @@ Deno.serve(async (req) => {
         domain_warning: domainWarning,
         watch_paths_warning: watchPathsWarning,
         dns_warning: dnsWarning,
+        initial_deploy_warning: initialDeployWarning,
+        initial_deploy_commit_sha: initialDeployCommitSha,
         build_watch_paths: watchPathIncludes,
         auto_deploy: true,
       }),
