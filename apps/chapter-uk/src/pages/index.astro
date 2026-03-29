@@ -1,0 +1,20 @@
+---
+import { getChapterData } from "@repo/template-core/lib/data";
+
+const slug = import.meta.env.CHAPTER_SLUG;
+const { chapter } = await getChapterData(slug);
+const defaultLocale = chapter.default_language;
+---
+
+<!doctype html>
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <meta http-equiv="refresh" content={`0;url=/${defaultLocale}/`} />
+    <link rel="canonical" href={`/${defaultLocale}/`} />
+    <title>Redirecting...</title>
+  </head>
+  <body>
+    <p>Redirecting to <a href={`/${defaultLocale}/`}>/{defaultLocale}/</a>...</p>
+  </body>
+</html>
