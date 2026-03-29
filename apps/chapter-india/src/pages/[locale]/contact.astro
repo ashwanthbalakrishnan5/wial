@@ -1,0 +1,206 @@
+---
+import BaseLayout from "@repo/template-core/layouts/BaseLayout.astro";
+import { getChapterData } from "@repo/template-core/lib/data";
+import { getBlock } from "@repo/template-core/lib/content";
+
+export async function getStaticPaths() {
+  const slug = import.meta.env.CHAPTER_SLUG;
+  const { chapter } = await getChapterData(slug);
+  return chapter.active_languages.map((lang: string) => ({
+    params: { locale: lang },
+  }));
+}
+
+const { locale } = Astro.params;
+const slug = import.meta.env.CHAPTER_SLUG;
+const supabaseUrl = import.meta.env.PUBLIC_SUPABASE_URL;
+const { chapter, contentBlocks } = await getChapterData(slug, locale);
+
+const title = getBlock(contentBlocks, "contact_title", "Contact Us");
+const description = getBlock(contentBlocks, "contact_description", "");
+const mapEmbedUrl = getBlock(contentBlocks, "contact_map_embed_url", "");
+---
+
+<BaseLayout title="Contact" locale={locale}>
+  {/* Page Hero */}
+  <section class="relative overflow-hidden py-16 md:py-24">
+    <div class="absolute inset-0" style="background: linear-gradient(135deg, var(--color-brand-primary-light) 0%, var(--color-warm-ivory) 60%, var(--color-brand-accent-light) 100%)"></div>
+    <div class="relative z-10 mx-auto max-w-[1200px] px-4 sm:px-6">
+      <div class="max-w-3xl">
+        <p class="overline text-brand-accent mb-3">Get in Touch</p>
+        <h1 class="text-4xl md:text-5xl lg:text-[3.5rem] font-bold font-heading tracking-tight" style="color:var(--color-brand-primary)">
+          {title}
+        </h1>
+        {description && (
+          <p class="text-lg text-text-secondary mt-4 max-w-xl">{description}</p>
+        )}
+      </div>
+    </div>
+    <div class="absolute bottom-0 left-0 right-0">
+      <svg viewBox="0 0 1440 48" preserveAspectRatio="none" class="w-full h-8 md:h-12" fill="var(--color-warm-ivory)">
+        <path d="M0,24 C360,48 1080,0 1440,28 L1440,48 L0,48 Z"/>
+      </svg>
+    </div>
+  </section>
+
+  <section class="py-12 md:py-16">
+    <div class="mx-auto max-w-[1200px] px-4 sm:px-6">
+      <div class="grid grid-cols-1 md:grid-cols-2 gap-10 md:gap-16">
+        {/* Contact Form */}
+        <div>
+          <h2 class="text-2xl font-bold font-heading mb-6">Send a Message</h2>
+          <div id="contact-success" class="hidden rounded-lg bg-green-50 border border-green-200 p-6 text-center">
+            <svg xmlns="http://www.w3.org/2000/svg" width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="mx-auto mb-3 text-green-500"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><path d="m9 11 3 3L22 4"/></svg>
+            <h3 class="text-lg font-semibold mb-1">Message sent!</h3>
+            <p class="text-sm text-text-secondary">We'll get back to you soon.</p>
+          </div>
+          <form id="contact-form" method="POST" action="#" class="space-y-5">
+            <div>
+              <label for="contact-name" class="block text-sm font-medium mb-1.5">
+                Name <span class="text-destructive">*</span>
+              </label>
+              <input
+                type="text"
+                id="contact-name"
+                name="name"
+                required
+                aria-required="true"
+                class="w-full px-4 py-2.5 rounded-lg border border-border bg-surface text-text-primary placeholder-text-muted focus:outline-none focus:border-brand-primary focus:ring-2 focus:ring-brand-primary/20"
+                placeholder="Your name"
+              />
+            </div>
+            <div>
+              <label for="contact-email" class="block text-sm font-medium mb-1.5">
+                Email <span class="text-destructive">*</span>
+              </label>
+              <input
+                type="email"
+                id="contact-email"
+                name="email"
+                required
+                aria-required="true"
+                class="w-full px-4 py-2.5 rounded-lg border border-border bg-surface text-text-primary placeholder-text-muted focus:outline-none focus:border-brand-primary focus:ring-2 focus:ring-brand-primary/20"
+                placeholder="you@example.com"
+              />
+            </div>
+            <div>
+              <label for="contact-message" class="block text-sm font-medium mb-1.5">
+                Message <span class="text-destructive">*</span>
+              </label>
+              <textarea
+                id="contact-message"
+                name="message"
+                required
+                aria-required="true"
+                rows="5"
+                class="w-full px-4 py-2.5 rounded-lg border border-border bg-surface text-text-primary placeholder-text-muted focus:outline-none focus:border-brand-primary focus:ring-2 focus:ring-brand-primary/20 resize-y"
+                placeholder="How can we help?"
+              ></textarea>
+            </div>
+            <div id="contact-error" class="hidden rounded-md bg-red-50 border border-red-200 px-4 py-3 text-sm text-red-700"></div>
+            <button
+              type="submit"
+              id="contact-submit"
+              class="px-6 py-3 text-sm font-semibold rounded-lg bg-brand-accent text-warm-charcoal hover:opacity-90 transition-opacity disabled:opacity-50"
+            >
+              Send Message
+            </button>
+          </form>
+          <script define:vars={{ supabaseUrl, chapterSlug: slug }}>
+            const form = document.getElementById('contact-form');
+            const successEl = document.getElementById('contact-success');
+            const errorEl = document.getElementById('contact-error');
+            const submitBtn = document.getElementById('contact-submit');
+            if (form) {
+              form.addEventListener('submit', async (e) => {
+                e.preventDefault();
+                errorEl.classList.add('hidden');
+                submitBtn.disabled = true;
+                submitBtn.textContent = 'Sending…';
+                const data = Object.fromEntries(new FormData(form));
+                try {
+                  const res = await fetch(supabaseUrl + '/functions/v1/contact-form', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ chapter_slug: chapterSlug, ...data }),
+                  });
+                  const json = await res.json();
+                  if (!res.ok) {
+                    errorEl.textContent = json.error || 'Something went wrong. Please try again.';
+                    errorEl.classList.remove('hidden');
+                    submitBtn.disabled = false;
+                    submitBtn.textContent = 'Send Message';
+                  } else {
+                    form.classList.add('hidden');
+                    successEl.classList.remove('hidden');
+                  }
+                } catch {
+                  errorEl.textContent = 'Network error. Please try again.';
+                  errorEl.classList.remove('hidden');
+                  submitBtn.disabled = false;
+                  submitBtn.textContent = 'Send Message';
+                }
+              });
+            }
+          </script>
+        </div>
+
+        {/* Contact Info */}
+        <div>
+          <h2 class="text-2xl font-bold font-heading mb-6">Get in Touch</h2>
+          <div class="space-y-5">
+            {chapter.contact_email && (
+              <div class="flex items-start gap-3">
+                <div class="w-10 h-10 rounded-lg bg-brand-primary-light flex items-center justify-center flex-shrink-0">
+                  <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="var(--color-brand-primary)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="20" height="16" x="2" y="4" rx="2"/><path d="m22 7-8.97 5.7a1.94 1.94 0 0 1-2.06 0L2 7"/></svg>
+                </div>
+                <div>
+                  <p class="text-sm font-medium">Email</p>
+                  <a href={`mailto:${chapter.contact_email}`} class="text-sm text-brand-primary hover:underline">
+                    {chapter.contact_email}
+                  </a>
+                </div>
+              </div>
+            )}
+            {chapter.contact_phone && (
+              <div class="flex items-start gap-3">
+                <div class="w-10 h-10 rounded-lg bg-brand-primary-light flex items-center justify-center flex-shrink-0">
+                  <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="var(--color-brand-primary)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92z"/></svg>
+                </div>
+                <div>
+                  <p class="text-sm font-medium">Phone</p>
+                  <a href={`tel:${chapter.contact_phone}`} class="text-sm text-brand-primary hover:underline">
+                    {chapter.contact_phone}
+                  </a>
+                </div>
+              </div>
+            )}
+            {chapter.contact_address && (
+              <div class="flex items-start gap-3">
+                <div class="w-10 h-10 rounded-lg bg-brand-primary-light flex items-center justify-center flex-shrink-0">
+                  <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="var(--color-brand-primary)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 10c0 6-8 12-8 12s-8-6-8-12a8 8 0 0 1 16 0Z"/><circle cx="12" cy="10" r="3"/></svg>
+                </div>
+                <div>
+                  <p class="text-sm font-medium">Address</p>
+                  <p class="text-sm text-text-secondary">{chapter.contact_address}</p>
+                </div>
+              </div>
+            )}
+          </div>
+
+          {mapEmbedUrl && (
+            <div class="mt-8">
+              <iframe
+                src={mapEmbedUrl}
+                title="Location map"
+                class="w-full aspect-video rounded-xl border border-border"
+                loading="lazy"
+                allowfullscreen
+              ></iframe>
+            </div>
+          )}
+        </div>
+      </div>
+    </div>
+  </section>
+</BaseLayout>

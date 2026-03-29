@@ -1,0 +1,97 @@
+---
+import BaseLayout from "@repo/template-core/layouts/BaseLayout.astro";
+import { getChapterData } from "@repo/template-core/lib/data";
+import { getBlock } from "@repo/template-core/lib/content";
+
+export async function getStaticPaths() {
+  const slug = import.meta.env.CHAPTER_SLUG;
+  const { chapter } = await getChapterData(slug);
+  return chapter.active_languages.map((lang: string) => ({
+    params: { locale: lang },
+  }));
+}
+
+const { locale } = Astro.params;
+const slug = import.meta.env.CHAPTER_SLUG;
+const { chapter, contentBlocks } = await getChapterData(slug, locale);
+
+const title = getBlock(contentBlocks, "about_title", `About ${chapter.name}`);
+const body = getBlock(contentBlocks, "about_body", "");
+const mission = getBlock(contentBlocks, "about_mission", "");
+const imageUrl = getBlock(contentBlocks, "about_image_url", "");
+---
+
+<BaseLayout title="About" locale={locale}>
+  {/* Page Hero — editorial banner */}
+  <section class="relative overflow-hidden py-16 md:py-24">
+    <div class="absolute inset-0" style="background: linear-gradient(135deg, var(--color-brand-primary-light) 0%, var(--color-warm-ivory) 60%, var(--color-brand-accent-light) 100%)"></div>
+    <div class="absolute -top-20 -right-20 w-80 h-80 rounded-full opacity-[0.04]" style="background: var(--color-brand-primary); filter: blur(60px)"></div>
+
+    <div class="relative z-10 mx-auto max-w-[1200px] px-4 sm:px-6">
+      <div class="max-w-3xl">
+        <p class="overline text-brand-accent mb-3">{chapter.name}</p>
+        <h1 class="text-4xl md:text-5xl lg:text-[3.5rem] font-bold font-heading tracking-tight" style="color:var(--color-brand-primary)">
+          {title}
+        </h1>
+      </div>
+    </div>
+
+    <div class="absolute bottom-0 left-0 right-0">
+      <svg viewBox="0 0 1440 48" preserveAspectRatio="none" class="w-full h-8 md:h-12" fill="var(--color-warm-ivory)">
+        <path d="M0,24 C360,48 1080,0 1440,28 L1440,48 L0,48 Z"/>
+      </svg>
+    </div>
+  </section>
+
+  {/* Content — editorial layout */}
+  <section class="py-12 md:py-16">
+    <div class="mx-auto max-w-[1200px] px-4 sm:px-6">
+      {/* Two-column on desktop when image exists */}
+      {imageUrl ? (
+        <div class="grid grid-cols-1 md:grid-cols-12 gap-10 md:gap-16 items-start">
+          {/* Text column */}
+          <div class="md:col-span-7 order-2 md:order-1">
+            {body && (
+              <div class="prose mb-10" set:html={body} />
+            )}
+
+            {mission && (
+              <blockquote class="relative pl-6 py-5 my-10 border-l-4 rounded-r-xl" style="border-color:var(--color-brand-accent);background:var(--color-brand-accent-light)">
+                <div class="absolute -top-2 left-3 text-4xl font-serif leading-none" style="color:var(--color-brand-accent);opacity:0.4" aria-hidden="true">&ldquo;</div>
+                <p class="text-lg italic text-text-primary leading-relaxed" set:html={mission} />
+              </blockquote>
+            )}
+          </div>
+
+          {/* Image column — sticky on desktop */}
+          <div class="md:col-span-5 order-1 md:order-2 md:sticky md:top-24">
+            <div class="relative">
+              <div class="absolute -inset-3 rounded-2xl" style="background: linear-gradient(135deg, var(--color-brand-primary-light), var(--color-brand-accent-light)); opacity: 0.5"></div>
+              <img
+                src={imageUrl}
+                alt={`About ${chapter.name}`}
+                class="relative w-full rounded-2xl object-cover"
+                loading="lazy"
+                width="500"
+                height="600"
+              />
+            </div>
+          </div>
+        </div>
+      ) : (
+        <div class="max-w-[42rem] mx-auto">
+          {body && (
+            <div class="prose mb-10" set:html={body} />
+          )}
+
+          {mission && (
+            <blockquote class="relative pl-6 py-5 my-10 border-l-4 rounded-r-xl" style="border-color:var(--color-brand-accent);background:var(--color-brand-accent-light)">
+              <div class="absolute -top-2 left-3 text-4xl font-serif leading-none" style="color:var(--color-brand-accent);opacity:0.4" aria-hidden="true">&ldquo;</div>
+              <p class="text-lg italic text-text-primary leading-relaxed" set:html={mission} />
+            </blockquote>
+          )}
+        </div>
+      )}
+    </div>
+  </section>
+</BaseLayout>

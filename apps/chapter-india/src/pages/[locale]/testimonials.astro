@@ -1,0 +1,69 @@
+---
+import BaseLayout from "@repo/template-core/layouts/BaseLayout.astro";
+import TestimonialCard from "@repo/template-core/components/TestimonialCard.astro";
+import { getChapterData } from "@repo/template-core/lib/data";
+import { getBlock } from "@repo/template-core/lib/content";
+
+export async function getStaticPaths() {
+  const slug = import.meta.env.CHAPTER_SLUG;
+  const { chapter } = await getChapterData(slug);
+  return chapter.active_languages.map((lang: string) => ({
+    params: { locale: lang },
+  }));
+}
+
+const { locale } = Astro.params;
+const slug = import.meta.env.CHAPTER_SLUG;
+const { chapter, contentBlocks, testimonials } = await getChapterData(slug, locale);
+
+const title = getBlock(contentBlocks, "testimonials_title", "Testimonials");
+const description = getBlock(contentBlocks, "testimonials_description", "");
+---
+
+<BaseLayout title="Testimonials" locale={locale}>
+  {/* Page Hero */}
+  <section class="relative overflow-hidden py-16 md:py-24">
+    <div class="absolute inset-0" style="background: linear-gradient(135deg, var(--color-brand-primary-light) 0%, var(--color-warm-ivory) 60%, var(--color-brand-accent-light) 100%)"></div>
+    <div class="absolute -top-20 -right-20 w-80 h-80 rounded-full opacity-[0.04]" style="background: var(--color-brand-primary); filter: blur(60px)"></div>
+
+    <div class="relative z-10 mx-auto max-w-[1200px] px-4 sm:px-6">
+      <div class="max-w-3xl">
+        <p class="overline text-brand-accent mb-3">Voices</p>
+        <h1 class="text-4xl md:text-5xl lg:text-[3.5rem] font-bold font-heading tracking-tight" style="color:var(--color-brand-primary)">
+          {title}
+        </h1>
+        {description && (
+          <p class="text-lg text-text-secondary mt-4 max-w-xl">{description}</p>
+        )}
+      </div>
+    </div>
+
+    <div class="absolute bottom-0 left-0 right-0">
+      <svg viewBox="0 0 1440 48" preserveAspectRatio="none" class="w-full h-8 md:h-12" fill="var(--color-warm-ivory)">
+        <path d="M0,24 C360,48 1080,0 1440,28 L1440,48 L0,48 Z"/>
+      </svg>
+    </div>
+  </section>
+
+  <section class="py-12 md:py-16">
+    <div class="mx-auto max-w-[1200px] px-4 sm:px-6">
+      {testimonials.length > 0 ? (
+        <div class="columns-1 md:columns-2 gap-6 max-w-4xl mx-auto [column-fill:balance]">
+          {testimonials.map((t, i) => (
+            <div class="mb-6 break-inside-avoid">
+              <TestimonialCard testimonial={t} featured={i === 0} />
+            </div>
+          ))}
+        </div>
+      ) : (
+        <div class="text-center py-20">
+          <div class="w-16 h-16 mx-auto mb-4 rounded-2xl flex items-center justify-center" style="background:var(--color-brand-primary-light)">
+            <svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" class="text-brand-primary"><path d="M3 21c3 0 7-1 7-8V5c0-1.25-.756-2.017-2-2H4c-1.25 0-2 .75-2 1.972V11c0 1.25.75 2 2 2 1 0 1 0 1 1v1c0 1-1 2-2 2s-1 .008-1 1.031V20c0 1 0 1 1 1z"/><path d="M15 21c3 0 7-1 7-8V5c0-1.25-.757-2.017-2-2h-4c-1.25 0-2 .75-2 1.972V11c0 1.25.75 2 2 2h.75c0 2.25.25 4-2.75 4v3c0 1 0 1 1 1z"/></svg>
+          </div>
+          <h3 class="text-lg font-semibold font-heading mb-2">Testimonials coming soon</h3>
+          <p class="text-sm text-text-secondary max-w-sm mx-auto">Check back soon for stories from our community.</p>
+        </div>
+      )}
+    </div>
+  </section>
+</BaseLayout>
