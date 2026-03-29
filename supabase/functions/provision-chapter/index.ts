@@ -62,11 +62,8 @@ async function cloudflareApi<T = unknown>(
 
 async function resolveZoneIdForDomain(
   token: string,
-  fqdn: string,
-  explicitZoneId?: string
+  fqdn: string
 ): Promise<string | null> {
-  if (explicitZoneId) return explicitZoneId;
-
   const labels = fqdn.split(".");
   for (let i = 0; i <= labels.length - 2; i++) {
     const candidateZone = labels.slice(i).join(".");
@@ -216,7 +213,7 @@ function generateTsConfig(): string {
   );
 }
 
-function generateEnv(slug: string): string {
+function generateEnvExample(slug: string): string {
   return `CHAPTER_SLUG=${slug}
 PUBLIC_SUPABASE_URL=
 SUPABASE_SERVICE_ROLE_KEY=
@@ -433,7 +430,7 @@ Deno.serve(async (req) => {
       { path: "package.json", content: generatePackageJson(slug) },
       { path: "astro.config.mjs", content: generateAstroConfig() },
       { path: "tsconfig.json", content: generateTsConfig() },
-      { path: ".env", content: generateEnv(slug) },
+      { path: ".env.example", content: generateEnvExample(slug) },
     ];
 
     const configBlobShas: Array<{ path: string; sha: string }> = [];
@@ -594,6 +591,32 @@ Deno.serve(async (req) => {
       "Content-Type": "application/json",
     };
 
+    // 2a) Fetch GitHub repo metadata for numeric IDs (required for source config)
+    const ghRepoRes = await githubApi(githubToken, `${repoPath}`);
+    if (!ghRepoRes.ok) {
+      throw new Error("Failed to fetch GitHub repo metadata for Cloudflare integration");
+    }
+    const ghRepoData = await ghRepoRes.json();
+    const repoId = ghRepoData.id; // numeric
+    const ownerId = ghRepoData.owner?.id; // numeric
+
+    const watchPathIncludes = [
+      `${chapterFolder}/*`,
+      `${chapterFolder}/**`,
+      "packages/*",
+      "packages/**",
+    ];
+
+    const envVars = {
+      PUBLIC_SUPABASE_URL: { value: supabaseUrl, type: "plain_text" },
+      SUPABASE_URL: { value: supabaseUrl, type: "plain_text" },
+      SUPABASE_SERVICE_ROLE_KEY: {
+        value: serviceRoleKey,
+        type: "secret_text",
+      },
+      CHAPTER_SLUG: { value: slug, type: "plain_text" },
+    };
+
     const createProjectRes = await fetch(cfBaseUrl, {
       method: "POST",
       headers: cfHeaders,
@@ -604,41 +627,32 @@ Deno.serve(async (req) => {
           build_command: `cd ${chapterFolder} && npm install && npx astro build`,
           destination_dir: `${chapterFolder}/dist`,
           root_dir: "",
+          build_caching: true,
         },
         source: {
           type: "github",
           config: {
             owner: githubOwner,
             repo_name: githubRepo,
+            owner_id: ownerId,
+            repo_id: repoId,
             production_branch: "main",
-            pr_comments_enabled: false,
+            pr_comments_enabled: true,
             deployments_enabled: true,
             production_deployments_enabled: true,
             preview_deployment_setting: "all",
+            preview_branch_includes: ["*"],
+            preview_branch_excludes: [],
+            path_includes: watchPathIncludes,
+            path_excludes: [],
           },
         },
         deployment_configs: {
           production: {
-            environment_variables: {
-              PUBLIC_SUPABASE_URL: { value: supabaseUrl, type: "plain_text" },
-              SUPABASE_URL: { value: supabaseUrl, type: "plain_text" }, // Backward compatibility
-              SUPABASE_SERVICE_ROLE_KEY: {
-                value: serviceRoleKey,
-                type: "secret_text",
-              },
-              CHAPTER_SLUG: { value: slug, type: "plain_text" },
-            },
+            env_vars: envVars,
           },
           preview: {
-            environment_variables: {
-              PUBLIC_SUPABASE_URL: { value: supabaseUrl, type: "plain_text" },
-              SUPABASE_URL: { value: supabaseUrl, type: "plain_text" }, // Backward compatibility
-              SUPABASE_SERVICE_ROLE_KEY: {
-                value: serviceRoleKey,
-                type: "secret_text",
-              },
-              CHAPTER_SLUG: { value: slug, type: "plain_text" },
-            },
+            env_vars: envVars,
           },
         },
       }),
@@ -663,39 +677,7 @@ Deno.serve(async (req) => {
       );
     }
 
-    // 2b) Configure build watch paths so only this chapter or shared packages trigger rebuilds
-    const watchPathIncludes = [
-      `${chapterFolder}/*`,
-      `${chapterFolder}/**`,
-      "packages/*",
-      "packages/**",
-    ];
-
-    const updateProjectRes = await fetch(`${cfBaseUrl}/${projectName}`, {
-      method: "PATCH",
-      headers: cfHeaders,
-      body: JSON.stringify({
-        source: {
-          type: "github",
-          config: {
-            owner: githubOwner,
-            repo_name: githubRepo,
-            production_branch: "main",
-            pr_comments_enabled: false,
-            deployments_enabled: true,
-            production_deployments_enabled: true,
-            preview_deployment_setting: "all",
-            path_includes: watchPathIncludes,
-            path_excludes: [],
-          },
-        },
-      }),
-    });
-
-    const updateProjectData = await updateProjectRes.json().catch(() => null);
-    const watchPathsWarning = !updateProjectRes.ok
-      ? `Build watch paths could not be configured: ${updateProjectData?.errors?.[0]?.message || "unknown error"}`
-      : null;
+    const watchPathsWarning: string | null = null;
 
     // =======================================================================
     // STEP 3 — Configure custom domain
@@ -714,23 +696,23 @@ Deno.serve(async (req) => {
     const domainWarning = !domainRes.ok
       ? `Custom domain setup needs attention: ${domainData?.errors?.[0]?.message || "unknown error"}`
       : null;
-    const cloudflareZoneId =
-      (domainData as { result?: { zone_tag?: string } } | null)?.result
-        ?.zone_tag ??
-      (await resolveZoneIdForDomain(
-        cloudflareApiToken,
-        customDomain,
-        explicitCloudflareZoneId || undefined
-      ));
 
-    const dnsWarning = cloudflareZoneId
-      ? await ensureCnameRecord(
-          cloudflareApiToken,
-          cloudflareZoneId,
-          customDomain,
-          `${projectName}.pages.dev`
-        )
-      : "Could not resolve Cloudflare zone ID; CNAME record was not verified/created";
+    // Resolve zone ID: prefer explicit env var, then auto-detect from domain
+    const cloudflareZoneId = explicitCloudflareZoneId
+      ? explicitCloudflareZoneId
+      : await resolveZoneIdForDomain(cloudflareApiToken, customDomain);
+
+    let dnsWarning: string | null = null;
+    if (!cloudflareZoneId) {
+      dnsWarning = `Could not resolve Cloudflare zone ID for ${customDomain}; CNAME record was not created. Set CLOUDFLARE_ZONE_ID env var.`;
+    } else {
+      dnsWarning = await ensureCnameRecord(
+        cloudflareApiToken,
+        cloudflareZoneId,
+        customDomain,
+        `${projectName}.pages.dev`
+      );
+    }
 
     // =======================================================================
     // STEP 4 — Update chapter record

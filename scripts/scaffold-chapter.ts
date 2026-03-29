@@ -14,7 +14,7 @@
  *   - package.json
  *   - astro.config.mjs
  *   - tsconfig.json
- *   - .env (placeholder)
+ *   - .env.example (template)
  *   - src/pages/ (copied from packages/template-core/scaffold/pages/)
  */
 
@@ -110,9 +110,9 @@ export default defineConfig({
     ) + "\n"
   );
 
-  // .env (placeholder — real values set by Cloudflare or CI)
+  // .env.example (template — real values set by Cloudflare or CI)
   writeFileSync(
-    join(chapterDir, ".env"),
+    join(chapterDir, ".env.example"),
     `CHAPTER_SLUG=${slug}
 PUBLIC_SUPABASE_URL=
 SUPABASE_SERVICE_ROLE_KEY=
@@ -133,7 +133,9 @@ SUPABASE_SERVICE_ROLE_KEY=
   console.log(`Done! Created apps/chapter-${slug}/`);
   console.log("");
   console.log("Next steps:");
-  console.log(`  1. Set environment variables in apps/chapter-${slug}/.env`);
+  console.log(
+    `  1. Copy apps/chapter-${slug}/.env.example to .env.local and set values`
+  );
   console.log(`  2. Run 'yarn install' from the monorepo root`);
   console.log(`  3. Run 'yarn workspace @repo/chapter-${slug} dev' to test locally`);
 }
