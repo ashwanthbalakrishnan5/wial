@@ -1,10 +1,17 @@
 @import "tailwindcss";
 @import "@repo/ui/globals.css";
 
+@source "../../../packages/ui/src/**/*.{ts,tsx}";
+
 body {
   font-family: var(--font-source-sans), system-ui, sans-serif;
 }
 
 h1, h2, h3, h4, h5, h6 {
   font-family: var(--font-lexend), system-ui, sans-serif;
+}
+
+/* Monospace for deployment logs and technical text */
+.font-mono, code, pre {
+  font-family: var(--font-jetbrains-mono, 'JetBrains Mono'), ui-monospace, 'Cascadia Code', 'Fira Code', monospace;
 }

@@ -8,7 +8,8 @@
   "scripts": {
     "build": "turbo run build",
     "dev": "turbo run dev",
-    "lint": "turbo run lint"
+    "lint": "turbo run lint",
+    "scaffold-chapter": "node --experimental-strip-types scripts/scaffold-chapter.ts"
   },
   "devDependencies": {
     "prettier": "^3.2.5",

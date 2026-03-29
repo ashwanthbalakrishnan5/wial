@@ -42,9 +42,14 @@ export default async function DashboardLayout({
     }
   }
 
+  // Auto-resolve chapter from user's role — no manual selection needed
+  const resolvedChapterId = isSuperAdmin(user.roles)
+    ? null
+    : user.roles.find((r) => r.chapter_id)?.chapter_id ?? null;
+
   return (
     <AuthProvider user={user}>
-      <ChapterProvider chapters={chapters}>
+      <ChapterProvider chapters={chapters} resolvedChapterId={resolvedChapterId}>
         <SidebarProvider>
           <AppSidebar />
           <SidebarInset>

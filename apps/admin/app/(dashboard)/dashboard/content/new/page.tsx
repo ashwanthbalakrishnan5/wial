@@ -1,8 +1,9 @@
 "use client";
 
 import { useState } from "react";
-import { useRouter, useSearchParams } from "next/navigation";
+import { useRouter } from "next/navigation";
 import { createClient } from "@repo/supabase/client";
+import { useChapter } from "@/components/providers/chapter-provider";
 import { Button } from "@repo/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@repo/ui/card";
 import { Input } from "@repo/ui/input";
@@ -19,8 +20,7 @@ import { Loader2 } from "lucide-react";
 
 export default function NewContentBlockPage() {
   const router = useRouter();
-  const searchParams = useSearchParams();
-  const chapterId = searchParams.get("chapter");
+  const { selectedChapterId } = useChapter();
   const [loading, setLoading] = useState(false);
 
   const [blockKey, setBlockKey] = useState("");
@@ -30,7 +30,7 @@ export default function NewContentBlockPage() {
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
-    if (!chapterId) {
+    if (!selectedChapterId) {
       toast.error("No chapter selected");
       return;
     }
@@ -40,7 +40,7 @@ export default function NewContentBlockPage() {
     const { data, error } = await supabase
       .from("content_blocks")
       .insert({
-        chapter_id: chapterId,
+        chapter_id: selectedChapterId,
         block_key: blockKey,
         content_type: contentType,
         locale,
@@ -56,7 +56,7 @@ export default function NewContentBlockPage() {
     }
 
     toast.success("Content block created.");
-    router.push(`/dashboard/content/${data.id}?chapter=${chapterId}`);
+    router.push(`/dashboard/content/${data.id}`);
   }
 
   return (

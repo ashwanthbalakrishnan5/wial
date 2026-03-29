@@ -1,0 +1,32 @@
+{
+  "name": "@repo/template-core",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "exports": {
+    "./layouts/BaseLayout.astro": "./src/layouts/BaseLayout.astro",
+    "./components/Header.astro": "./src/components/Header.astro",
+    "./components/Footer.astro": "./src/components/Footer.astro",
+    "./components/HeroSection.astro": "./src/components/HeroSection.astro",
+    "./components/StatsStrip.astro": "./src/components/StatsStrip.astro",
+    "./components/CoachCard.astro": "./src/components/CoachCard.astro",
+    "./components/TestimonialCard.astro": "./src/components/TestimonialCard.astro",
+    "./components/CertBadge.astro": "./src/components/CertBadge.astro",
+    "./components/AccordionItem.astro": "./src/components/AccordionItem.astro",
+    "./components/SkipLink.astro": "./src/components/SkipLink.astro",
+    "./components/SocialIcon.astro": "./src/components/SocialIcon.astro",
+    "./lib/supabase": "./src/lib/supabase.ts",
+    "./lib/content": "./src/lib/content.ts",
+    "./lib/data": "./src/lib/data.ts",
+    "./lib/utils": "./src/lib/utils.ts",
+    "./styles/global.css": "./src/styles/global.css"
+  },
+  "dependencies": {
+    "@repo/types": "*",
+    "@supabase/supabase-js": "^2.49.4"
+  },
+  "devDependencies": {
+    "astro": "^6.0.0",
+    "typescript": "5.5.4"
+  }
+}

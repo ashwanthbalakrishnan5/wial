@@ -1,11 +1,11 @@
 ---
-import BaseLayout from "../../layouts/BaseLayout.astro";
-import HeroSection from "../../components/HeroSection.astro";
-import StatsStrip from "../../components/StatsStrip.astro";
-import CoachCard from "../../components/CoachCard.astro";
-import TestimonialCard from "../../components/TestimonialCard.astro";
-import { getChapterData } from "../../lib/data";
-import { getBlock } from "../../lib/content";
+import BaseLayout from "@repo/template-core/layouts/BaseLayout.astro";
+import HeroSection from "@repo/template-core/components/HeroSection.astro";
+import StatsStrip from "@repo/template-core/components/StatsStrip.astro";
+import CoachCard from "@repo/template-core/components/CoachCard.astro";
+import TestimonialCard from "@repo/template-core/components/TestimonialCard.astro";
+import { getChapterData } from "@repo/template-core/lib/data";
+import { getBlock } from "@repo/template-core/lib/content";
 
 export async function getStaticPaths() {
   const slug = import.meta.env.CHAPTER_SLUG;
@@ -63,7 +63,7 @@ const stats = [
             {getBlock(contentBlocks, "coaches_description", "Our certified Action Learning coaches are ready to help you grow.")}
           </p>
         </div>
-        <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6 pt-10">
+        <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-x-6 gap-y-16 pt-14">
           {featuredCoaches.map((coach) => (
             <CoachCard coach={coach} locale={locale} />
           ))}

@@ -3,7 +3,6 @@
 import { useState, useRef, useCallback } from "react";
 import { createClient } from "@repo/supabase/client";
 import { Input } from "@repo/ui/input";
-import { Badge } from "@repo/ui/badge";
 import { Loader2, Search, X, Sparkles } from "lucide-react";
 import Link from "next/link";
 
@@ -20,11 +19,11 @@ interface SearchResult {
   chapter_id: string;
 }
 
-const certColors: Record<string, "default" | "secondary" | "destructive" | "outline"> = {
-  CALC: "default",
-  SALC: "secondary",
-  MALC: "outline",
-  PALC: "destructive",
+const certBadgeClass: Record<string, string> = {
+  CALC: "bg-blue-100 text-blue-700 border-l-2 border-blue-500 dark:bg-blue-900/30 dark:text-blue-300",
+  SALC: "bg-green-100 text-green-700 border-l-2 border-green-500 dark:bg-green-900/30 dark:text-green-300",
+  MALC: "bg-amber-100 text-amber-700 border-l-2 border-amber-500 dark:bg-amber-900/30 dark:text-amber-300",
+  PALC: "bg-purple-100 text-purple-700 border-l-2 border-purple-600 dark:bg-purple-900/30 dark:text-purple-300",
 };
 
 export function CoachSearch({ chapterId }: { chapterId?: string }) {
@@ -147,7 +146,7 @@ export function CoachSearch({ chapterId }: { chapterId?: string }) {
                   return (
                     <Link
                       key={coach.id}
-                      href={`/dashboard/coaches/${coach.id}?chapter=${chapterId ?? coach.chapter_id}`}
+                      href={`/dashboard/coaches/${coach.id}`}
                       className="flex items-center gap-4 p-4 hover:bg-muted/50 transition-colors"
                     >
                       {/* Avatar */}
@@ -178,9 +177,9 @@ export function CoachSearch({ chapterId }: { chapterId?: string }) {
                         </div>
                       </div>
 
-                      <Badge variant={certColors[coach.certification_level] ?? "outline"}>
+                      <span className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium ${certBadgeClass[coach.certification_level] ?? "bg-muted text-muted-foreground"}`}>
                         {coach.certification_level}
-                      </Badge>
+                      </span>
 
                       {mode === "semantic" && coach.similarity > 0 && (
                         <span className="text-xs text-muted-foreground tabular-nums">

@@ -1,18 +1,21 @@
-import { getAuthUser } from "@/lib/auth";
+import { getAuthUser, isSuperAdmin } from "@/lib/auth";
 import { createClient } from "@repo/supabase/server";
 import { redirect } from "next/navigation";
+import { cookies } from "next/headers";
 import { TestimonialsClient } from "./testimonials-client";
 
-export default async function TestimonialsPage({
-  searchParams,
-}: {
-  searchParams: Promise<{ chapter?: string }>;
-}) {
-  const { chapter: chapterId } = await searchParams;
+export default async function TestimonialsPage() {
   const user = await getAuthUser();
   if (!user) redirect("/login");
 
-  if (!chapterId) {
+  const isAdmin = isSuperAdmin(user.roles);
+  const cookieStore = await cookies();
+  const selectedChapterCookie = cookieStore.get("selected-chapter")?.value;
+  const resolvedChapterId = isAdmin
+    ? selectedChapterCookie || undefined
+    : user.roles.find((r) => r.chapter_id)?.chapter_id ?? undefined;
+
+  if (!resolvedChapterId) {
     return (
       <div className="space-y-6">
         <h1 className="text-3xl font-semibold tracking-tight">
@@ -29,13 +32,13 @@ export default async function TestimonialsPage({
   const { data: testimonials } = await supabase
     .from("testimonials")
     .select("*")
-    .eq("chapter_id", chapterId)
+    .eq("chapter_id", resolvedChapterId)
     .order("sort_order");
 
   return (
     <TestimonialsClient
       testimonials={testimonials ?? []}
-      chapterId={chapterId}
+      chapterId={resolvedChapterId}
     />
   );
 }

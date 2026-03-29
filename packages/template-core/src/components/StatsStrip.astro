@@ -1,0 +1,68 @@
+---
+interface Stat {
+  value: string;
+  label: string;
+}
+
+interface Props {
+  stats: Stat[];
+}
+
+const { stats } = Astro.props;
+---
+
+{stats.length > 0 && (
+  <section class="bg-surface-muted border-y border-border-subtle" aria-label="Statistics">
+    <div class="mx-auto max-w-[1200px] px-4 sm:px-6 py-10">
+      <div class="flex flex-wrap justify-center gap-x-16 gap-y-8">
+        {stats.map((stat) => {
+          const numericMatch = stat.value.match(/^(\d+)/);
+          const numericValue = numericMatch ? parseInt(numericMatch[1]) : null;
+          const suffix = numericMatch ? stat.value.slice(numericMatch[1].length) : "";
+          return (
+            <div class="text-center">
+              <p class="text-3xl md:text-4xl font-bold font-heading text-brand-primary">
+                {numericValue !== null ? (
+                  <span class="stat-counter" data-target={numericValue} data-suffix={suffix}>0{suffix}</span>
+                ) : (
+                  stat.value
+                )}
+              </p>
+              <p class="text-sm text-text-secondary mt-1">{stat.label}</p>
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  </section>
+)}
+
+<script>
+  function animateCounters() {
+    const counters = document.querySelectorAll('.stat-counter');
+    const observer = new IntersectionObserver((entries) => {
+      entries.forEach((entry) => {
+        if (!entry.isIntersecting) return;
+        const el = entry.target as HTMLElement;
+        if (el.dataset.animated) return;
+        el.dataset.animated = 'true';
+        const target = parseInt(el.dataset.target || '0');
+        const suffix = el.dataset.suffix || '';
+        const duration = 800;
+        const start = performance.now();
+        function tick(now: number) {
+          const elapsed = now - start;
+          const progress = Math.min(elapsed / duration, 1);
+          const eased = 1 - Math.pow(1 - progress, 3);
+          const current = Math.round(eased * target);
+          el.textContent = `${current}${suffix}`;
+          if (progress < 1) requestAnimationFrame(tick);
+        }
+        requestAnimationFrame(tick);
+        observer.unobserve(el);
+      });
+    }, { threshold: 0.5 });
+    counters.forEach((c) => observer.observe(c));
+  }
+  animateCounters();
+</script>

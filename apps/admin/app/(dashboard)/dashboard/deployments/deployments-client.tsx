@@ -19,68 +19,16 @@ import {
   TooltipProvider,
   TooltipTrigger,
 } from "@repo/ui/tooltip";
-import { Rocket, ExternalLink, Loader2, CheckCircle2, XCircle, Clock, Zap, Sparkles } from "lucide-react";
+import { Rocket, ExternalLink, Loader2, CheckCircle2, XCircle, Clock, Zap, Sparkles, User } from "lucide-react";
+import { Avatar, AvatarFallback } from "@repo/ui/avatar";
 import type { Tables } from "@repo/types";
+import { useTranslations } from "next-intl";
 
 type Deployment = Tables<"deployments"> & {
   profiles: { full_name: string } | null;
 };
 
 type Chapter = Tables<"chapters">;
-
-const STATUS_CONFIG: Record<
-  string,
-  { label: string; variant: "default" | "secondary" | "destructive" | "outline"; icon: React.ReactNode }
-> = {
-  queued: {
-    label: "Queued",
-    variant: "outline",
-    icon: <Clock className="h-3 w-3" />,
-  },
-  building: {
-    label: "Building",
-    variant: "secondary",
-    icon: <Loader2 className="h-3 w-3 animate-spin" />,
-  },
-  deploying: {
-    label: "Deploying",
-    variant: "secondary",
-    icon: <Loader2 className="h-3 w-3 animate-spin" />,
-  },
-  done: {
-    label: "Live",
-    variant: "default",
-    icon: <CheckCircle2 className="h-3 w-3" />,
-  },
-  failed: {
-    label: "Failed",
-    variant: "destructive",
-    icon: <XCircle className="h-3 w-3" />,
-  },
-};
-
-function formatDuration(createdAt: string, completedAt: string | null) {
-  if (!completedAt) return "—";
-  const ms = new Date(completedAt).getTime() - new Date(createdAt).getTime();
-  const seconds = Math.floor(ms / 1000);
-  if (seconds < 60) return `${seconds}s`;
-  const minutes = Math.floor(seconds / 60);
-  const remainingSeconds = seconds % 60;
-  return `${minutes}m ${remainingSeconds}s`;
-}
-
-function formatRelativeTime(dateStr: string) {
-  const date = new Date(dateStr);
-  const now = new Date();
-  const diffMs = now.getTime() - date.getTime();
-  const diffMins = Math.floor(diffMs / 60000);
-  if (diffMins < 1) return "just now";
-  if (diffMins < 60) return `${diffMins}m ago`;
-  const diffHours = Math.floor(diffMins / 60);
-  if (diffHours < 24) return `${diffHours}h ago`;
-  const diffDays = Math.floor(diffHours / 24);
-  return `${diffDays}d ago`;
-}
 
 export function DeploymentsClient({
   chapter,
@@ -94,6 +42,52 @@ export function DeploymentsClient({
   const [isPending, startTransition] = useTransition();
   const [isDeploying, setIsDeploying] = useState(false);
   const [deployError, setDeployError] = useState<string | null>(null);
+  const t = useTranslations("deployments");
+  const tc = useTranslations("common");
+
+  const STATUS_CONFIG: Record<
+    string,
+    { label: string; variant: "default" | "secondary" | "destructive" | "outline"; icon: React.ReactNode }
+  > = {
+    queued: {
+      label: t("queued"),
+      variant: "outline",
+      icon: <Clock className="h-3 w-3" />,
+    },
+    building: {
+      label: t("building"),
+      variant: "secondary",
+      icon: <Loader2 className="h-3 w-3 animate-spin" />,
+    },
+    deploying: {
+      label: t("deploying"),
+      variant: "secondary",
+      icon: <Loader2 className="h-3 w-3 animate-spin" />,
+    },
+    done: {
+      label: t("live"),
+      variant: "default",
+      icon: <CheckCircle2 className="h-3 w-3" />,
+    },
+    failed: {
+      label: t("failed"),
+      variant: "destructive",
+      icon: <XCircle className="h-3 w-3" />,
+    },
+  };
+
+  function formatRelativeTime(dateStr: string) {
+    const date = new Date(dateStr);
+    const now = new Date();
+    const diffMs = now.getTime() - date.getTime();
+    const diffMins = Math.floor(diffMs / 60000);
+    if (diffMins < 1) return tc("justNow");
+    if (diffMins < 60) return tc("minsAgo", { count: diffMins });
+    const diffHours = Math.floor(diffMins / 60);
+    if (diffHours < 24) return tc("hoursAgo", { count: diffHours });
+    const diffDays = Math.floor(diffHours / 24);
+    return tc("daysAgo", { count: diffDays });
+  }
 
   const hasInProgress = deployments.some((d) =>
     ["queued", "building", "deploying"].includes(d.status)
@@ -101,38 +95,10 @@ export function DeploymentsClient({
   const latestDone = deployments.find((d) => d.status === "done");
 
   // Realtime subscription for live status
-  useEffect(() => {
-    const supabase = createClient();
-    const channel = supabase
-      .channel(`deployments:${chapter.id}`)
-      .on(
-        "postgres_changes",
-        {
-          event: "*",
-          schema: "public",
-          table: "deployments",
-          filter: `chapter_id=eq.${chapter.id}`,
-        },
-        () => {
-          // Refresh page data on any change
-          startTransition(() => router.refresh());
-        }
-      )
-      .subscribe();
-
-    return () => {
-      supabase.removeChannel(channel);
-    };
-  }, [chapter.id, router]);
-
-  // Sync with server refreshes
-  useEffect(() => {
-    setDeployments(initialDeployments);
-  }, [initialDeployments]);
-
+...
   async function handleDeploy() {
-    if (!chapter.cloudflare_deploy_hook_url) {
-      setDeployError("This chapter has no deploy hook configured. Contact a Super Admin to provision the chapter first.");
+    if (!chapter.github_folder_path || !chapter.cloudflare_project_name) {
+      setDeployError(t("notProvisionedTrigger"));
       return;
     }
     setIsDeploying(true);
@@ -145,7 +111,7 @@ export function DeploymentsClient({
       });
       const data = await res.json();
       if (!res.ok) {
-        setDeployError(data.error ?? "Failed to trigger deployment.");
+        setDeployError(data.error ?? t("failed"));
       } else {
         startTransition(() => router.refresh());
       }
@@ -161,23 +127,22 @@ export function DeploymentsClient({
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-3xl font-semibold tracking-tight">Deployments</h1>
+          <h1 className="text-3xl font-semibold tracking-tight">{t("title")}</h1>
           <p className="text-muted-foreground">
-            Manage and track website deployments for{" "}
-            <span className="font-medium">{chapter.name}</span>.
+            {t("manage", { name: chapter.name })}
           </p>
         </div>
         <Button
           onClick={handleDeploy}
           disabled={isDeploying || hasInProgress || isPending}
-          className="gap-2"
+          className="gap-2 bg-accent text-accent-foreground hover:bg-accent/90"
         >
           {isDeploying || (hasInProgress && isPending) ? (
             <Loader2 className="h-4 w-4 animate-spin" />
           ) : (
             <Zap className="h-4 w-4" />
           )}
-          {hasInProgress ? "Building…" : "Deploy Now"}
+          {hasInProgress ? t("building") : t("deployNow")}
         </Button>
       </div>
 
@@ -187,11 +152,64 @@ export function DeploymentsClient({
         </div>
       )}
 
+      {/* Deployment Progress Track */}
+      {hasInProgress && (
+        <div className="rounded-lg border bg-card p-6 shadow-sm">
+          <h3 className="text-sm font-medium text-muted-foreground mb-6">{t("deploymentInProgress")}</h3>
+          <div className="relative flex items-center justify-between max-w-2xl mx-auto">
+            <div className="absolute left-0 top-1/2 -translate-y-1/2 w-full h-1 bg-muted rounded-full" />
+            
+            {["queued", "building", "deploying", "done"].map((step, i) => {
+              const currentIdx = ["queued", "building", "deploying", "done"].indexOf(deployments[0]?.status || "queued");
+              const isCompleted = i < currentIdx || (i === 3 && currentIdx === 3);
+              const isCurrent = i === currentIdx;
+              
+              return (
+                <div key={step} className="relative flex flex-col items-center gap-2 bg-card px-2">
+                  <div className={`w-8 h-8 rounded-full flex items-center justify-center border-2 transition-colors ${
+                    isCompleted ? "bg-green-500 border-green-500 text-white" :
+                    isCurrent ? "bg-card border-primary text-primary shadow-[0_0_0_4px_var(--theme-primary-alpha-20)] animate-pulse" :
+                    "bg-card border-muted text-muted-foreground"
+                  }`}>
+                    {isCompleted ? <CheckCircle2 className="h-5 w-5" /> : 
+                     isCurrent ? <Loader2 className="h-4 w-4 animate-spin" /> : 
+                     <span className="text-xs font-semibold">{i + 1}</span>}
+                  </div>
+                  <span className={`text-xs font-medium capitalize ${
+                    isCompleted || isCurrent ? "text-foreground" : "text-muted-foreground"
+                  }`}>{t(step)}</span>
+                </div>
+              );
+            })}
+          </div>
+          
+          {deployments[0]?.build_log ? (
+            <div className="mt-8 rounded-md bg-slate-950 p-4 font-mono text-xs text-slate-300 h-40 overflow-y-auto border border-slate-800">
+              <pre className="whitespace-pre-wrap">{deployments[0].build_log}</pre>
+            </div>
+          ) : (
+            <div className="mt-8 rounded-md bg-slate-950 p-4 font-mono text-xs text-slate-300 h-40 overflow-y-auto border border-slate-800">
+              <div className="text-slate-500 mb-2"># {t("buildLogFor", { subdomain: chapter.subdomain })}</div>
+              {deployments[0]?.commit_reference && (
+                <div className="mb-1">{">"} {t("commit")}: <span className="text-blue-400">{deployments[0].commit_reference.slice(0, 8)}</span></div>
+              )}
+              <div className="mb-1 flex items-center gap-2">
+                {">"} {deployments[0]?.status === "queued" ? t("waitingForBuildRunner") :
+                       deployments[0]?.status === "building" ? t("buildingStaticPages") :
+                       deployments[0]?.status === "deploying" ? t("deployingToCloudflare") :
+                       t("processing")}
+                <span className="flex h-1.5 w-1.5 rounded-full bg-blue-400 animate-ping" />
+              </div>
+            </div>
+          )}
+        </div>
+      )}
+
       {/* Live site info */}
       {latestDone && (
         <div className="flex items-center gap-3 rounded-lg border bg-card px-4 py-3">
           <span className="inline-block h-2 w-2 rounded-full bg-green-500" />
-          <span className="text-sm font-medium">Live</span>
+          <span className="text-sm font-medium">{t("live")}</span>
           {latestDone.deploy_url ? (
             <a
               href={latestDone.deploy_url}
@@ -208,14 +226,14 @@ export function DeploymentsClient({
             </span>
           )}
           <span className="ml-auto text-xs text-muted-foreground">
-            Last deployed {formatRelativeTime(latestDone.completed_at ?? latestDone.created_at)}
+            {t("lastDeployed", { time: formatRelativeTime(latestDone.completed_at ?? latestDone.created_at) })}
           </span>
         </div>
       )}
 
-      {!chapter.cloudflare_deploy_hook_url && (
+      {(!chapter.github_folder_path || !chapter.cloudflare_project_name) && (
         <div className="rounded-md border border-amber-500/50 bg-amber-500/10 px-4 py-3 text-sm text-amber-700 dark:text-amber-400">
-          This chapter has not been provisioned yet. A Super Admin must provision the Cloudflare Pages project before deploying.
+          {t("notProvisioned")}
         </div>
       )}
 
@@ -226,32 +244,39 @@ export function DeploymentsClient({
             <Table>
               <TableHeader>
                 <TableRow>
-                  <TableHead>Type</TableHead>
-                  <TableHead>Status</TableHead>
-                  <TableHead>Triggered By</TableHead>
-                  <TableHead>AI Prompt</TableHead>
-                  <TableHead>Date</TableHead>
-                  <TableHead>Duration</TableHead>
-                  <TableHead>URL</TableHead>
+                  <TableHead>{t("type")}</TableHead>
+                  <TableHead>{tc("allStatus")}</TableHead>
+                  <TableHead>{t("triggeredBy")}</TableHead>
+                  <TableHead>{t("aiPrompt")}</TableHead>
+                  <TableHead>{t("date")}</TableHead>
+                  <TableHead>{t("duration")}</TableHead>
+                  <TableHead>{t("url")}</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
                 {deployments.map((deployment) => {
                   const cfg = STATUS_CONFIG[deployment.status] ?? STATUS_CONFIG.queued!;
                   const isAiEdit = !!deployment.ai_prompt;
+                  const isLatestLive = latestDone?.id === deployment.id;
+                  const initials = deployment.profiles?.full_name
+                    ?.split(" ")
+                    .map((n) => n[0])
+                    .join("")
+                    .slice(0, 2)
+                    .toUpperCase() ?? "";
                   return (
-                    <TableRow key={deployment.id}>
+                    <TableRow key={deployment.id} className={isLatestLive ? "border-l-2 border-l-green-500" : ""}>
                       {/* Type */}
                       <TableCell>
                         {isAiEdit ? (
                           <Badge variant="secondary" className="flex w-fit items-center gap-1">
                             <Sparkles className="h-3 w-3" />
-                            AI Edit
+                            {tc("aiEditor")}
                           </Badge>
                         ) : (
                           <Badge variant="outline" className="flex w-fit items-center gap-1">
                             <Rocket className="h-3 w-3" />
-                            Deploy
+                            {t("title")}
                           </Badge>
                         )}
                       </TableCell>
@@ -285,8 +310,17 @@ export function DeploymentsClient({
                         </div>
                       </TableCell>
                       {/* Triggered By */}
-                      <TableCell className="text-sm">
-                        {deployment.profiles?.full_name ?? "System"}
+                      <TableCell>
+                        <div className="flex items-center gap-2">
+                          <Avatar className="h-6 w-6">
+                            <AvatarFallback className="text-[10px] bg-muted">
+                              {initials || <User className="h-3 w-3" />}
+                            </AvatarFallback>
+                          </Avatar>
+                          <span className="text-sm">
+                            {deployment.profiles?.full_name ?? "System"}
+                          </span>
+                        </div>
                       </TableCell>
                       {/* AI Prompt */}
                       <TableCell className="max-w-[200px]">
@@ -322,7 +356,7 @@ export function DeploymentsClient({
                             rel="noopener noreferrer"
                             className="flex items-center gap-1 text-sm text-primary hover:underline"
                           >
-                            View site
+                            {t("viewSite")}
                             <ExternalLink className="h-3 w-3" />
                           </a>
                         ) : isAiEdit && deployment.preview_url ? (
@@ -332,7 +366,7 @@ export function DeploymentsClient({
                             rel="noopener noreferrer"
                             className="flex items-center gap-1 text-sm text-amber-600 hover:underline"
                           >
-                            Preview
+                            {t("preview")}
                             <ExternalLink className="h-3 w-3" />
                           </a>
                         ) : deployment.error_message ? (
@@ -361,9 +395,9 @@ export function DeploymentsClient({
       ) : (
         <div className="flex flex-col items-center justify-center rounded-lg border border-dashed p-12 text-center">
           <Rocket className="h-12 w-12 text-muted-foreground" />
-          <h3 className="mt-4 text-lg font-semibold">No deployments yet</h3>
+          <h3 className="mt-4 text-lg font-semibold">{t("noDeployments")}</h3>
           <p className="mt-1 text-sm text-muted-foreground">
-            Click "Deploy Now" to publish your chapter website.
+            {t("noDeploymentsDesc")}
           </p>
         </div>
       )}

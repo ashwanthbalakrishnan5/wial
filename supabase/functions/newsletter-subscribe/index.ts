@@ -1,4 +1,5 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.49.4";
+import { sendEmail, emailLayout, escapeHtml } from "../_shared/email.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -20,10 +21,6 @@ function checkRateLimit(ip: string): boolean {
   entry.count++;
   return true;
 }
-
-// Subscribers are stored in a content_blocks JSON block keyed "newsletter_subscribers"
-// per chapter. This avoids needing a separate table while keeping data in Supabase.
-// Each entry: { email: string, name: string, subscribed_at: string }
 
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") {
@@ -78,7 +75,7 @@ Deno.serve(async (req) => {
     // Verify chapter exists and is active
     const { data: chapter } = await supabase
       .from("chapters")
-      .select("id, status")
+      .select("id, name, status, brand_primary_color, brand_logo_url")
       .eq("slug", chapter_slug)
       .single();
 
@@ -89,59 +86,55 @@ Deno.serve(async (req) => {
       });
     }
 
-    // Upsert subscriber into a JSON content block for this chapter
-    const blockKey = "newsletter_subscribers";
-    const { data: existing } = await supabase
-      .from("content_blocks")
-      .select("id, content")
-      .eq("chapter_id", chapter.id)
-      .eq("block_key", blockKey)
-      .eq("locale", "en")
-      .single();
-
-    const newEntry = {
-      email: email.toLowerCase().trim(),
-      name: name?.trim() ?? "",
-      subscribed_at: new Date().toISOString(),
-    };
-
-    if (existing) {
-      let subscribers: Array<{ email: string; name: string; subscribed_at: string }> = [];
-      try {
-        subscribers = JSON.parse(existing.content);
-        if (!Array.isArray(subscribers)) subscribers = [];
-      } catch {
-        subscribers = [];
-      }
-
-      // Deduplicate by email
-      const alreadySubscribed = subscribers.some(
-        (s) => s.email === newEntry.email
+    // Insert into newsletter_subscribers table (unique constraint handles duplicates)
+    const normalizedEmail = email.toLowerCase().trim();
+    const { error: insertError } = await supabase
+      .from("newsletter_subscribers")
+      .upsert(
+        {
+          chapter_id: chapter.id,
+          email: normalizedEmail,
+          name: name?.trim() ?? null,
+          is_active: true,
+        },
+        { onConflict: "chapter_id,email" }
       );
-      if (alreadySubscribed) {
-        return new Response(
-          JSON.stringify({ success: true, message: "Already subscribed" }),
-          {
-            status: 200,
-            headers: { ...corsHeaders, "Content-Type": "application/json" },
-          }
-        );
-      }
 
-      subscribers.push(newEntry);
-      await supabase
-        .from("content_blocks")
-        .update({ content: JSON.stringify(subscribers) })
-        .eq("id", existing.id);
-    } else {
-      await supabase.from("content_blocks").insert({
-        chapter_id: chapter.id,
-        block_key: blockKey,
-        locale: "en",
-        content_type: "json",
-        content: JSON.stringify([newEntry]),
-      });
+    if (insertError) {
+      console.error("Newsletter subscribe error:", insertError);
+      return new Response(
+        JSON.stringify({ error: "Failed to subscribe. Please try again." }),
+        {
+          status: 500,
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        }
+      );
     }
+
+    // Send welcome email
+    const primary = chapter.brand_primary_color || "#1A7A8A";
+    const subscriberName = name?.trim() || "there";
+    const welcomeBody = `
+      <h1 style="font-family:Lexend,sans-serif;color:${primary};font-size:24px;margin:0 0 16px;">
+        Welcome to ${escapeHtml(chapter.name)}!
+      </h1>
+      <p>Hi ${escapeHtml(subscriberName)},</p>
+      <p>Thank you for subscribing to updates from <strong>${escapeHtml(chapter.name)}</strong>. You'll receive news about upcoming events, workshops, and community highlights.</p>
+      <div style="background:#f9fafb;border-radius:8px;padding:16px;margin:16px 0;text-align:center;">
+        <p style="margin:0;font-size:14px;color:#6b7280;">You're all set!</p>
+        <p style="margin:4px 0 0;font-size:16px;font-weight:600;color:${primary};">Stay tuned for updates</p>
+      </div>
+      <p style="color:#6b7280;font-size:14px;">If you didn't subscribe to this newsletter, you can safely ignore this email.</p>`;
+
+    await sendEmail({
+      to: normalizedEmail,
+      subject: `Welcome to ${chapter.name} newsletter`,
+      html: emailLayout(welcomeBody, {
+        chapterName: chapter.name,
+        primaryColor: primary,
+        logoUrl: chapter.brand_logo_url || undefined,
+      }),
+    });
 
     return new Response(
       JSON.stringify({ success: true }),

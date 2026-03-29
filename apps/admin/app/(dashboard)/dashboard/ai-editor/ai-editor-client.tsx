@@ -23,33 +23,21 @@ import {
   Clock,
   ExternalLink,
   Eye,
-  ThumbsUp,
-  ThumbsDown,
   Play,
   RefreshCw,
   Send,
   Trash2,
+  Pencil,
+  Rocket,
 } from "lucide-react";
 import type { Tables } from "@repo/types";
+import { useTranslations } from "next-intl";
 
 type Deployment = Tables<"deployments"> & {
   profiles: { full_name: string } | null;
 };
 
 type Chapter = Tables<"chapters">;
-
-function formatRelativeTime(dateStr: string) {
-  const date = new Date(dateStr);
-  const now = new Date();
-  const diffMs = now.getTime() - date.getTime();
-  const diffMins = Math.floor(diffMs / 60000);
-  if (diffMins < 1) return "just now";
-  if (diffMins < 60) return `${diffMins}m ago`;
-  const diffHours = Math.floor(diffMins / 60);
-  if (diffHours < 24) return `${diffHours}h ago`;
-  const diffDays = Math.floor(diffHours / 24);
-  return `${diffDays}d ago`;
-}
 
 export function AiEditorClient({
   chapter,
@@ -69,6 +57,21 @@ export function AiEditorClient({
   const [isPending, startTransition] = useTransition();
   const [promptHistory, setPromptHistory] = useState<string[]>([]);
   const [previewKey, setPreviewKey] = useState(0);
+  const t = useTranslations("aiEditor");
+  const tc = useTranslations("common");
+
+  function formatRelativeTime(dateStr: string) {
+    const date = new Date(dateStr);
+    const now = new Date();
+    const diffMs = now.getTime() - date.getTime();
+    const diffMins = Math.floor(diffMs / 60000);
+    if (diffMins < 1) return tc("justNow");
+    if (diffMins < 60) return tc("minsAgo", { count: diffMins });
+    const diffHours = Math.floor(diffMins / 60);
+    if (diffHours < 24) return tc("hoursAgo", { count: diffHours });
+    const diffDays = Math.floor(diffHours / 24);
+    return tc("daysAgo", { count: diffDays });
+  }
 
   // Active session: has pending approval_status and is in an active state
   const activeSession = deployments.find(
@@ -131,7 +134,7 @@ export function AiEditorClient({
       });
       const data = await res.json();
       if (!res.ok) {
-        setError(data.error ?? "Failed to start session.");
+        setError(data.error ?? t("failed"));
       } else {
         startTransition(() => router.refresh());
       }
@@ -140,7 +143,7 @@ export function AiEditorClient({
     } finally {
       setIsStarting(false);
     }
-  }, [chapter.id, router]);
+  }, [chapter.id, router, t]);
 
   const handleSendPrompt = useCallback(async () => {
     if (!prompt.trim() || !activeSession) return;
@@ -160,7 +163,7 @@ export function AiEditorClient({
       });
       const data = await res.json();
       if (!res.ok) {
-        setError(data.error ?? "Failed to send prompt.");
+        setError(data.error ?? t("failed"));
       } else {
         setPromptHistory((prev) => [...prev, promptText]);
         setPrompt("");
@@ -171,7 +174,7 @@ export function AiEditorClient({
     } finally {
       setIsSubmitting(false);
     }
-  }, [prompt, activeSession, router]);
+  }, [prompt, activeSession, router, t]);
 
   const handleApproval = useCallback(
     async (action: "approve" | "reject") => {
@@ -187,7 +190,7 @@ export function AiEditorClient({
         });
         const data = await res.json();
         if (!res.ok) {
-          setError(data.error ?? `Failed to ${action} edit.`);
+          setError(data.error ?? t("failed"));
         } else {
           startTransition(() => router.refresh());
         }
@@ -197,8 +200,29 @@ export function AiEditorClient({
         setIsApproving(false);
       }
     },
-    [activeSession, router]
+    [activeSession, router, t]
   );
+
+  // Elapsed time counter for building state
+  const [elapsed, setElapsed] = useState(0);
+
+  useEffect(() => {
+    if (activeSession?.status !== "building") {
+      setElapsed(0);
+      return;
+    }
+    const start = Date.now();
+    const interval = setInterval(() => {
+      setElapsed(Math.floor((Date.now() - start) / 1000));
+    }, 1000);
+    return () => clearInterval(interval);
+  }, [activeSession?.status]);
+
+  const formatElapsed = (s: number) => {
+    const m = Math.floor(s / 60);
+    const sec = s % 60;
+    return m > 0 ? `${m}m ${sec}s` : `${sec}s`;
+  };
 
   // Can accept a new prompt when session is idle (queued or deploying)
   const canSendPrompt =
@@ -214,10 +238,9 @@ export function AiEditorClient({
     <div className="space-y-6">
       {/* Header */}
       <div>
-        <h1 className="text-3xl font-semibold tracking-tight">AI Editor</h1>
+        <h1 className="text-3xl font-semibold tracking-tight">{t("title")}</h1>
         <p className="text-muted-foreground">
-          Start an editing session, send prompts to iterate on changes, then
-          deploy when you're happy with the preview.
+          {t("description")}
         </p>
       </div>
 
@@ -232,10 +255,9 @@ export function AiEditorClient({
         <Card>
           <CardContent className="flex flex-col items-center justify-center py-12 text-center">
             <Sparkles className="h-12 w-12 text-muted-foreground" />
-            <h3 className="mt-4 text-lg font-semibold">Ready to edit</h3>
+            <h3 className="mt-4 text-lg font-semibold">{t("readyToEdit")}</h3>
             <p className="mt-1 max-w-md text-sm text-muted-foreground">
-              Start a session to create an isolated branch. You can then send
-              multiple prompts, preview changes, and deploy when ready.
+              {t("readyToEditDesc")}
             </p>
             <Button
               onClick={handleStartSession}
@@ -248,7 +270,7 @@ export function AiEditorClient({
               ) : (
                 <Play className="h-4 w-4" />
               )}
-              Start Editing Session
+              {t("startEditingSession")}
             </Button>
           </CardContent>
         </Card>
@@ -259,38 +281,67 @@ export function AiEditorClient({
         <div className="grid gap-6 lg:grid-cols-5">
           {/* Left column: Prompt + History */}
           <div className="space-y-6 lg:col-span-3">
-            {/* Session status bar */}
+            {/* Vertical progress indicator */}
             <Card>
-              <CardContent className="flex items-center justify-between py-3">
-                <div className="flex items-center gap-3">
-                  {activeSession.status === "queued" && (
-                    <>
-                      <Clock className="h-4 w-4 text-muted-foreground" />
-                      <span className="text-sm font-medium text-muted-foreground">
-                        Session started — enter your first edit below
-                      </span>
-                    </>
-                  )}
-                  {activeSession.status === "building" && (
-                    <>
-                      <Loader2 className="h-4 w-4 animate-spin text-amber-500" />
-                      <span className="text-sm font-medium text-amber-500">
-                        AI is editing your site...
-                      </span>
-                    </>
-                  )}
-                  {activeSession.status === "deploying" && (
-                    <>
-                      <Eye className="h-4 w-4 text-green-500" />
-                      <span className="text-sm font-medium text-green-500">
-                        Preview ready — review, send more edits, or deploy
-                      </span>
-                    </>
-                  )}
+              <CardContent className="py-4">
+                <div className="flex items-center justify-between mb-4">
+                  <h3 className="text-sm font-medium text-muted-foreground">{t("sessionProgress")}</h3>
+                  <span className="text-xs text-muted-foreground">
+                    {t("started", { time: formatRelativeTime(activeSession.created_at) })}
+                  </span>
                 </div>
-                <span className="text-xs text-muted-foreground">
-                  Started {formatRelativeTime(activeSession.created_at)}
-                </span>
+                <div className="space-y-0">
+                  {(["queued", "building", "deploying", "done"] as const).map((step, i, arr) => {
+                    const statusOrder = { queued: 0, building: 1, deploying: 2, done: 3 };
+                    const currentIdx = statusOrder[activeSession.status as keyof typeof statusOrder] ?? 0;
+                    const isCompleted = i < currentIdx;
+                    const isCurrent = i === currentIdx;
+                    const labels: Record<string, string> = {
+                      queued: t("waitingToStart"),
+                      building: `${t("aiIsEditing")}${isCurrent && elapsed > 0 ? ` (${t("elapsed", { time: formatElapsed(elapsed) })})` : ""}`,
+                      deploying: t("previewReady"),
+                      done: t("changesDeployed"),
+                    };
+
+                    return (
+                      <div key={step} className="flex items-start gap-3">
+                        <div className="flex flex-col items-center">
+                          <div className={`flex h-6 w-6 items-center justify-center rounded-full border-2 transition-all ${
+                            isCompleted
+                              ? "border-green-500 bg-green-500 text-white"
+                              : isCurrent
+                                ? "border-primary bg-background text-primary shadow-[0_0_0_3px_oklch(var(--primary)/0.2)]"
+                                : "border-muted bg-background text-muted-foreground"
+                          }`}>
+                            {isCompleted ? (
+                              <CheckCircle2 className="h-4 w-4" />
+                            ) : isCurrent && activeSession.status === "building" ? (
+                              <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                            ) : isCurrent ? (
+                              <span className="h-2 w-2 rounded-full bg-primary" />
+                            ) : (
+                              <span className="h-2 w-2 rounded-full bg-muted" />
+                            )}
+                          </div>
+                          {i < arr.length - 1 && (
+                            <div className={`w-0.5 h-6 ${isCompleted ? "bg-green-500" : "bg-muted"}`} />
+                          )}
+                        </div>
+                        <div className="pt-0.5">
+                          <span className={`text-sm ${
+                            isCurrent
+                              ? "font-medium text-foreground"
+                              : isCompleted
+                                ? "text-muted-foreground line-through"
+                                : "text-muted-foreground"
+                          }`}>
+                            {labels[step]}
+                          </span>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
               </CardContent>
             </Card>
 
@@ -298,7 +349,7 @@ export function AiEditorClient({
             {promptHistory.length > 0 && (
               <Card>
                 <CardHeader>
-                  <CardTitle className="text-sm">Prompt History</CardTitle>
+                  <CardTitle className="text-sm">{t("promptHistory")}</CardTitle>
                 </CardHeader>
                 <CardContent className="space-y-2">
                   {promptHistory.map((p, i) => (
@@ -322,18 +373,16 @@ export function AiEditorClient({
                 <CardTitle className="flex items-center gap-2">
                   <Sparkles className="h-5 w-5" />
                   {activeSession.status === "queued"
-                    ? "First Edit"
-                    : "Follow-up Edit"}
+                    ? t("firstEdit")
+                    : t("followUpEdit")}
                 </CardTitle>
               </CardHeader>
               <CardContent className="space-y-4">
-                <p className="text-sm text-muted-foreground">
-                  {activeSession.status === "queued"
-                    ? "Describe what you'd like to change on your website."
-                    : "Describe additional changes or refinements."}
+                <p className="text-xs text-muted-foreground">
+                  {t("promptDescription")}
                 </p>
                 <Textarea
-                  placeholder="e.g., Change the hero title to 'Welcome to WIAL Nigeria' and make the CTA button green..."
+                  placeholder={t("placeholder")}
                   value={prompt}
                   onChange={(e) => setPrompt(e.target.value)}
                   disabled={!canSendPrompt}
@@ -346,7 +395,7 @@ export function AiEditorClient({
                 />
                 <div className="flex items-center justify-between">
                   <span className="text-xs text-muted-foreground">
-                    Ctrl+Enter to send
+                    {t("ctrlEnterToSend")}
                   </span>
                   <Button
                     onClick={handleSendPrompt}
@@ -358,7 +407,7 @@ export function AiEditorClient({
                     ) : (
                       <Send className="h-4 w-4" />
                     )}
-                    Send Prompt
+                    {t("sendPrompt")}
                   </Button>
                 </div>
               </CardContent>
@@ -378,7 +427,7 @@ export function AiEditorClient({
               <Card>
                 <CardHeader>
                   <CardTitle className="flex items-center justify-between">
-                    Preview
+                    {t("preview")}
                     <div className="flex items-center gap-2">
                       <button
                         onClick={() => setPreviewKey((k) => k + 1)}
@@ -394,7 +443,7 @@ export function AiEditorClient({
                         className="text-sm font-normal text-primary hover:underline"
                       >
                         <ExternalLink className="mr-1 inline h-3 w-3" />
-                        Open in new tab
+                        {t("openInNewTab")}
                       </a>
                     </div>
                   </CardTitle>
@@ -413,29 +462,42 @@ export function AiEditorClient({
                     {activeSession.preview_url}
                   </p>
 
-                  {/* Deploy / Discard */}
-                  <div className="flex gap-2">
+                  {/* Approve & Deploy / Edit More / Discard */}
+                  <div className="flex flex-col gap-2">
                     <Button
                       onClick={() => handleApproval("approve")}
                       disabled={isApproving || isPending}
-                      className="flex-1 gap-2"
+                      className="w-full gap-2 bg-accent text-accent-foreground hover:bg-accent/90"
                     >
                       {isApproving ? (
                         <Loader2 className="h-4 w-4 animate-spin" />
                       ) : (
-                        <ThumbsUp className="h-4 w-4" />
+                        <Rocket className="h-4 w-4" />
                       )}
-                      Deploy to Production
+                      {t("approveAndDeploy")}
                     </Button>
-                    <Button
-                      variant="destructive"
-                      onClick={() => handleApproval("reject")}
-                      disabled={isApproving || isPending}
-                      className="gap-2"
-                    >
-                      <Trash2 className="h-4 w-4" />
-                      Discard
-                    </Button>
+                    <div className="flex gap-2">
+                      <Button
+                        variant="secondary"
+                        onClick={() => {
+                          const textarea = document.querySelector<HTMLTextAreaElement>("textarea");
+                          textarea?.focus();
+                        }}
+                        className="flex-1 gap-2"
+                      >
+                        <Pencil className="h-4 w-4" />
+                        {t("editMore")}
+                      </Button>
+                      <Button
+                        variant="ghost"
+                        onClick={() => handleApproval("reject")}
+                        disabled={isApproving || isPending}
+                        className="gap-2 text-destructive hover:text-destructive"
+                      >
+                        <Trash2 className="h-4 w-4" />
+                        {t("discard")}
+                      </Button>
+                    </div>
                   </div>
                 </CardContent>
               </Card>
@@ -447,11 +509,16 @@ export function AiEditorClient({
                 <CardContent className="flex flex-col items-center justify-center py-12 text-center">
                   <Loader2 className="h-10 w-10 animate-spin text-amber-500" />
                   <p className="mt-4 text-sm text-muted-foreground">
-                    AI is editing your site files...
+                    {t("aiIsEditing")}
                   </p>
                   <p className="mt-1 text-xs text-muted-foreground">
                     Preview will appear here when ready
                   </p>
+                  {elapsed > 0 && (
+                    <p className="mt-2 font-mono text-xs text-muted-foreground">
+                      {t("elapsed", { time: formatElapsed(elapsed) })}
+                    </p>
+                  )}
                 </CardContent>
               </Card>
             )}
@@ -461,7 +528,7 @@ export function AiEditorClient({
               <Card>
                 <CardContent className="space-y-4 py-6">
                   <p className="text-sm text-muted-foreground">
-                    Session is ready. Enter a prompt to start editing.
+                    {t("enterPromptToStart")}
                   </p>
                   <Button
                     variant="ghost"
@@ -471,7 +538,7 @@ export function AiEditorClient({
                     className="gap-2 text-destructive hover:text-destructive"
                   >
                     <Trash2 className="h-3.5 w-3.5" />
-                    Cancel Session
+                    {t("cancelSession")}
                   </Button>
                 </CardContent>
               </Card>
@@ -484,16 +551,16 @@ export function AiEditorClient({
       {pastSessions.length > 0 && (
         <Card>
           <CardHeader>
-            <CardTitle>Past Sessions</CardTitle>
+            <CardTitle>{t("pastSessions")}</CardTitle>
           </CardHeader>
           <CardContent>
             <div className="rounded-md border">
               <Table>
                 <TableHeader>
                   <TableRow>
-                    <TableHead>Last Prompt</TableHead>
-                    <TableHead>Outcome</TableHead>
-                    <TableHead>Date</TableHead>
+                    <TableHead>{t("lastPrompt")}</TableHead>
+                    <TableHead>{t("outcome")}</TableHead>
+                    <TableHead>{t("date")}</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
@@ -503,26 +570,23 @@ export function AiEditorClient({
                         {session.ai_prompt ?? "No prompts sent"}
                       </TableCell>
                       <TableCell>
-                        {session.approval_status === "approved" ? (
-                          <Badge variant="default" className="gap-1">
+                        <Badge
+                          variant={
+                            session.approval_status === "approved"
+                              ? "default"
+                              : session.approval_status === "rejected"
+                                ? "destructive"
+                                : "secondary"
+                          }
+                          className="gap-1"
+                        >
+                          {session.approval_status === "approved" ? (
                             <CheckCircle2 className="h-3 w-3" />
-                            Deployed
-                          </Badge>
-                        ) : session.approval_status === "rejected" ? (
-                          <Badge variant="destructive" className="gap-1">
+                          ) : (
                             <XCircle className="h-3 w-3" />
-                            Discarded
-                          </Badge>
-                        ) : (
-                          <Badge variant="secondary" className="gap-1">
-                            {session.status === "failed" ? (
-                              <XCircle className="h-3 w-3" />
-                            ) : (
-                              <CheckCircle2 className="h-3 w-3" />
-                            )}
-                            {session.status === "failed" ? "Failed" : "Done"}
-                          </Badge>
-                        )}
+                          )}
+                          {t("outcomeStatus", { status: session.approval_status ?? session.status })}
+                        </Badge>
                       </TableCell>
                       <TableCell className="text-sm text-muted-foreground">
                         {formatRelativeTime(session.created_at)}

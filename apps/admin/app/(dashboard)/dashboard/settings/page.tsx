@@ -1,18 +1,21 @@
 import { getAuthUser, isSuperAdmin, getUserRoleForChapter } from "@/lib/auth";
 import { createClient } from "@repo/supabase/server";
+import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
 import { SettingsClient } from "./settings-client";
 
-export default async function SettingsPage({
-  searchParams,
-}: {
-  searchParams: Promise<{ chapter?: string }>;
-}) {
-  const { chapter: chapterId } = await searchParams;
+export default async function SettingsPage() {
   const user = await getAuthUser();
   if (!user) redirect("/login");
 
-  if (!chapterId) {
+  const isAdmin = isSuperAdmin(user.roles);
+  const cookieStore = await cookies();
+  const selectedChapterCookie = cookieStore.get("selected-chapter")?.value;
+  const resolvedChapterId = isAdmin
+    ? selectedChapterCookie || undefined
+    : user.roles.find((r) => r.chapter_id)?.chapter_id ?? undefined;
+
+  if (!resolvedChapterId) {
     return (
       <div className="space-y-6">
         <h1 className="text-3xl font-semibold tracking-tight">Settings</h1>
@@ -27,7 +30,7 @@ export default async function SettingsPage({
   const { data: chapter } = await supabase
     .from("chapters")
     .select("*")
-    .eq("id", chapterId)
+    .eq("id", resolvedChapterId)
     .single();
 
   if (!chapter) {
@@ -39,14 +42,13 @@ export default async function SettingsPage({
     );
   }
 
-  const isAdmin = isSuperAdmin(user.roles);
-  const isLead = getUserRoleForChapter(user.roles, chapterId) === "chapter_lead";
+  const isLead = getUserRoleForChapter(user.roles, resolvedChapterId) === "chapter_lead";
 
   // Fetch AI coach matching setting
   const { data: aiMatchBlock } = await supabase
     .from("content_blocks")
     .select("content")
-    .eq("chapter_id", chapterId)
+    .eq("chapter_id", resolvedChapterId)
     .eq("block_key", "ai_coach_matching_enabled")
     .eq("locale", chapter.default_language)
     .single();

@@ -1,5 +1,6 @@
 import { getAuthUser, isSuperAdmin } from "@/lib/auth";
 import { createClient } from "@repo/supabase/server";
+import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
 import {
   Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
@@ -7,17 +8,17 @@ import {
 import { Badge } from "@repo/ui/badge";
 import { UserManagementClient } from "./user-management-client";
 
-export default async function UsersPage({
-  searchParams,
-}: {
-  searchParams: Promise<{ chapter?: string }>;
-}) {
-  const { chapter: chapterId } = await searchParams;
+export default async function UsersPage() {
   const user = await getAuthUser();
   if (!user) redirect("/login");
 
   const supabase = await createClient();
   const isAdmin = isSuperAdmin(user.roles);
+  const cookieStore = await cookies();
+  const selectedChapterCookie = cookieStore.get("selected-chapter")?.value;
+  const resolvedChapterId = isAdmin
+    ? selectedChapterCookie || undefined
+    : user.roles.find((r) => r.chapter_id)?.chapter_id ?? undefined;
 
   // Fetch users with roles
   let query = supabase
@@ -25,20 +26,20 @@ export default async function UsersPage({
     .select("*, profiles(full_name, email, avatar_url)")
     .order("created_at", { ascending: false });
 
-  if (chapterId) {
-    query = query.eq("chapter_id", chapterId);
+  if (resolvedChapterId) {
+    query = query.eq("chapter_id", resolvedChapterId);
   }
 
   const { data: roles } = await query;
 
-  // Fetch invitations
+  // Fetch invitations with inviter profile
   let invQuery = supabase
     .from("invitations")
-    .select("*")
+    .select("*, inviter:profiles!invited_by(full_name, email)")
     .order("created_at", { ascending: false });
 
-  if (chapterId) {
-    invQuery = invQuery.eq("chapter_id", chapterId);
+  if (resolvedChapterId) {
+    invQuery = invQuery.eq("chapter_id", resolvedChapterId);
   }
 
   const { data: invitations } = await invQuery;
@@ -47,7 +48,7 @@ export default async function UsersPage({
     <UserManagementClient
       roles={roles ?? []}
       invitations={invitations ?? []}
-      chapterId={chapterId ?? null}
+      chapterId={resolvedChapterId ?? null}
       isSuperAdmin={isAdmin}
     />
   );

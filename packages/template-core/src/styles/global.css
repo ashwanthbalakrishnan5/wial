@@ -1,5 +1,11 @@
 @import "tailwindcss";
 
+/* ===== Explicitly scan template-core and all chapter app files ===== */
+/* Tailwind v4 vite plugin only scans from the chapter app's project root by default,
+   so it misses responsive classes used in packages/template-core components. */
+@source "../**/*.astro";
+@source "../../../../apps/**/*.astro";
+
 /* ===== Brand CSS Custom Properties (fallbacks, overridden at build time) ===== */
 :root {
   --color-brand-primary: #1a7a8a;
@@ -110,75 +116,11 @@ img {
 }
 
 /* ===== Hamburger Menu (Pure CSS) ===== */
+/* Mobile nav styles are scoped inside Header.astro component */
 #nav-toggle {
   position: absolute;
   opacity: 0;
   pointer-events: none;
-}
-
-.hamburger-btn {
-  display: flex;
-  flex-direction: column;
-  justify-content: center;
-  gap: 5px;
-  width: 44px;
-  height: 44px;
-  padding: 10px;
-  cursor: pointer;
-  z-index: 60;
-  position: relative;
-}
-
-.hamburger-line {
-  display: block;
-  width: 24px;
-  height: 2px;
-  background-color: var(--color-text-primary);
-  border-radius: 2px;
-  transition: transform 0.25s ease, opacity 0.25s ease;
-}
-
-#nav-toggle:checked ~ .hamburger-btn .hamburger-line:nth-child(1) {
-  transform: translateY(7px) rotate(45deg);
-}
-#nav-toggle:checked ~ .hamburger-btn .hamburger-line:nth-child(2) {
-  opacity: 0;
-}
-#nav-toggle:checked ~ .hamburger-btn .hamburger-line:nth-child(3) {
-  transform: translateY(-7px) rotate(-45deg);
-}
-
-.mobile-nav {
-  position: fixed;
-  inset: 0;
-  z-index: 50;
-  background: var(--color-surface);
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  gap: 32px;
-  transform: translateX(100%);
-  transition: transform 0.25s ease-out;
-}
-
-#nav-toggle:checked ~ .mobile-nav {
-  transform: translateX(0);
-}
-
-.mobile-nav a {
-  font-family: var(--font-heading);
-  font-size: 1.375rem;
-  font-weight: 500;
-  color: var(--color-text-primary);
-  text-decoration: none;
-  padding: 8px 16px;
-  border-radius: 8px;
-}
-.mobile-nav a:hover,
-.mobile-nav a[aria-current="page"] {
-  color: var(--color-brand-primary);
-  background-color: var(--color-brand-primary-light);
 }
 
 /* ===== Accordion (details/summary) ===== */
@@ -246,6 +188,17 @@ details > p {
 .cert-salc { background-color: rgba(22, 163, 74, 0.15); color: #15803d; border-left: 2px solid #16a34a; }
 .cert-malc { background-color: rgba(217, 119, 6, 0.15); color: #b45309; border-left: 2px solid #d97706; }
 .cert-palc { background-color: rgba(124, 58, 237, 0.15); color: #6d28d9; border-left: 2px solid #7c3aed; }
+
+/* ===== Reduced Motion ===== */
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+  html { scroll-behavior: auto; }
+}
 
 /* ===== Low-Bandwidth / Text-Only Mode ===== */
 /* Activates automatically when the user has data saver enabled or prefers reduced data */

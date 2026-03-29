@@ -2,9 +2,34 @@ import { type NextRequest, NextResponse } from "next/server";
 import { updateSession } from "@repo/supabase/middleware";
 import { createServerClient } from "@supabase/ssr";
 
+const SUPPORTED_LOCALES = ["en", "es", "fr", "pt"];
+
+function detectLocaleFromHeader(request: NextRequest): string | undefined {
+  const acceptLang = request.headers.get("accept-language");
+  if (!acceptLang) return undefined;
+  const segments = acceptLang.split(",").map((s) => s.trim().split(";")[0]!.trim());
+  for (const seg of segments) {
+    const lang = seg.split("-")[0]!.toLowerCase();
+    if (SUPPORTED_LOCALES.includes(lang)) return lang;
+  }
+  return undefined;
+}
+
 export async function proxy(request: NextRequest) {
   // First, update the session (refresh tokens)
   const response = await updateSession(request);
+
+  // Auto-detect locale from Accept-Language if no cookie is set
+  if (!request.cookies.get("locale")) {
+    const detected = detectLocaleFromHeader(request);
+    if (detected) {
+      response.cookies.set("locale", detected, {
+        path: "/",
+        maxAge: 365 * 24 * 60 * 60,
+        sameSite: "lax",
+      });
+    }
+  }
 
   // Now check auth for protected routes
   const { pathname } = request.nextUrl;

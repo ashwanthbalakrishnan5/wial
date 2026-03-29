@@ -1,27 +1,36 @@
-import { getAuthUser } from "@/lib/auth";
+import { getAuthUser, isSuperAdmin } from "@/lib/auth";
 import { createClient } from "@repo/supabase/server";
 import { redirect } from "next/navigation";
 import Link from "next/link";
 import { Button } from "@repo/ui/button";
 import { Card, CardContent } from "@repo/ui/card";
 import { Badge } from "@repo/ui/badge";
-import { Plus, FileText } from "lucide-react";
+import { Plus, FileText, Home, Info, BookOpen, Users, Quote, Phone, UserPlus, Navigation, Footprints, Calendar, Library } from "lucide-react";
+import { cookies } from "next/headers";
 
-const pageGroups: Record<string, string> = {
-  hero: "Landing Page",
-  about: "About Page",
-  al: "Action Learning Page",
-  coaches: "Coach Directory",
-  testimonials: "Testimonials Page",
-  contact: "Contact Page",
-  join: "Membership Page",
-  nav: "Header Navigation",
-  footer: "Footer",
+const pageGroups: Record<string, { label: string; icon: React.ElementType }> = {
+  hero: { label: "Landing Page", icon: Home },
+  about: { label: "About Page", icon: Info },
+  al: { label: "Action Learning Page", icon: BookOpen },
+  cert: { label: "Certification", icon: BookOpen },
+  coaches: { label: "Coach Directory", icon: Users },
+  testimonials: { label: "Testimonials Page", icon: Quote },
+  events: { label: "Events Page", icon: Calendar },
+  resources: { label: "Resources Page", icon: Library },
+  contact: { label: "Contact Page", icon: Phone },
+  join: { label: "Membership Page", icon: UserPlus },
+  nav: { label: "Header Navigation", icon: Navigation },
+  footer: { label: "Footer", icon: Footprints },
 };
 
 function getPageGroup(blockKey: string): string {
   const prefix = blockKey.split("_")[0]!;
-  return pageGroups[prefix] ?? "Other";
+  return pageGroups[prefix]?.label ?? "Other";
+}
+
+function getPageIcon(group: string): React.ElementType {
+  const entry = Object.values(pageGroups).find((v) => v.label === group);
+  return entry?.icon ?? FileText;
 }
 
 function humanizeKey(key: string): string {
@@ -33,11 +42,18 @@ function humanizeKey(key: string): string {
 export default async function ContentPage({
   searchParams,
 }: {
-  searchParams: Promise<{ chapter?: string; locale?: string }>;
+  searchParams: Promise<{ locale?: string }>;
 }) {
-  const { chapter: chapterId, locale: selectedLocale } = await searchParams;
+  const { locale: selectedLocale } = await searchParams;
   const user = await getAuthUser();
   if (!user) redirect("/login");
+
+  const isAdmin = isSuperAdmin(user.roles);
+  const cookieStore = await cookies();
+  const selectedChapterCookie = cookieStore.get("selected-chapter")?.value;
+  const chapterId = isAdmin
+    ? selectedChapterCookie || undefined
+    : user.roles.find((r) => r.chapter_id)?.chapter_id ?? undefined;
 
   if (!chapterId) {
     return (
@@ -129,7 +145,7 @@ export default async function ContentPage({
           </p>
         </div>
         <Button asChild>
-          <Link href={`/dashboard/content/new?chapter=${chapterId}`}>
+          <Link href="/dashboard/content/new">
             <Plus className="mr-2 h-4 w-4" />
             New Block
           </Link>
@@ -146,7 +162,7 @@ export default async function ContentPage({
             return (
               <Link
                 key={lang}
-                href={`/dashboard/content?chapter=${chapterId}&locale=${lang}`}
+                href={`/dashboard/content?locale=${lang}`}
                 className={`px-4 py-2 text-sm font-medium border-b-2 transition-colors ${
                   isActive
                     ? "border-primary text-primary"
@@ -174,7 +190,7 @@ export default async function ContentPage({
             website.
           </p>
           <Button asChild className="mt-4">
-            <Link href={`/dashboard/content/new?chapter=${chapterId}`}>
+            <Link href="/dashboard/content/new">
               <Plus className="mr-2 h-4 w-4" />
               New Block
             </Link>
@@ -186,12 +202,17 @@ export default async function ContentPage({
           const missingBlocks = untranslatedGrouped[group] ?? [];
           return (
             <div key={group} className="space-y-3">
-              <h2 className="text-lg font-semibold">{group}</h2>
+              {(() => { const Icon = getPageIcon(group); return (
+                <h2 className="text-lg font-semibold flex items-center gap-2">
+                  <Icon className="h-5 w-5 text-muted-foreground" />
+                  {group}
+                </h2>
+              ); })()}
               <div className="grid gap-3 sm:grid-cols-2">
                 {existingBlocks.map((block) => (
                   <Link
                     key={block.id}
-                    href={`/dashboard/content/${block.id}?chapter=${chapterId}`}
+                    href={`/dashboard/content/${block.id}`}
                   >
                     <Card className="transition-colors hover:border-primary/50">
                       <CardContent className="p-4">
@@ -234,12 +255,14 @@ export default async function ContentPage({
                             {humanizeKey(block.block_key)}
                           </p>
                           <p className="text-sm text-muted-foreground italic">
-                            Not translated to {currentLocale.toUpperCase()}
+                            Not yet created for {currentLocale.toUpperCase()}
                           </p>
                         </div>
-                        <Badge variant="outline" className="text-xs">
-                          {block.content_type.replace("_", " ")}
-                        </Badge>
+                        <Button variant="ghost" size="sm" asChild>
+                          <Link href={`/dashboard/content/new?key=${block.block_key}&type=${block.content_type}&locale=${currentLocale}`}>
+                            Create
+                          </Link>
+                        </Button>
                       </div>
                     </CardContent>
                   </Card>

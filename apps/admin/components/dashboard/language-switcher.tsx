@@ -1,37 +1,55 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import { useLocale } from "next-intl";
+import { useLocale, useTranslations } from "next-intl";
+import { Check, Globe } from "lucide-react";
+import { Button } from "@repo/ui/button";
 import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@repo/ui/select";
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@repo/ui/dropdown-menu";
 import { locales, localeNames, type Locale } from "@/i18n/config";
 
 export function LanguageSwitcher() {
   const router = useRouter();
   const currentLocale = useLocale();
 
-  function handleChange(locale: string) {
-    document.cookie = `locale=${locale};path=/;max-age=${60 * 60 * 24 * 365}`;
+  function handleChange(locale: Locale) {
+    document.cookie = `locale=${locale};path=/;max-age=${60 * 60 * 24 * 365};samesite=lax`;
     router.refresh();
   }
 
   return (
-    <Select value={currentLocale} onValueChange={handleChange}>
-      <SelectTrigger className="w-[72px] h-8 text-xs">
-        <SelectValue />
-      </SelectTrigger>
-      <SelectContent>
+    <DropdownMenu>
+      <DropdownMenuTrigger asChild>
+        <Button
+          variant="ghost"
+          size="sm"
+          className="h-8 gap-1.5 px-2 text-xs font-medium"
+          aria-label="Change language"
+        >
+          <Globe className="h-3.5 w-3.5" />
+          {currentLocale.toUpperCase()}
+        </Button>
+      </DropdownMenuTrigger>
+      <DropdownMenuContent align="end" className="w-[160px]">
         {locales.map((locale) => (
-          <SelectItem key={locale} value={locale}>
-            {locale.toUpperCase()}
-          </SelectItem>
+          <DropdownMenuItem
+            key={locale}
+            onClick={() => handleChange(locale)}
+            className="flex items-center justify-between"
+          >
+            <span className={currentLocale === locale ? "text-primary font-medium" : ""}>
+              {localeNames[locale]}
+            </span>
+            {currentLocale === locale && (
+              <Check className="h-4 w-4 text-primary" />
+            )}
+          </DropdownMenuItem>
         ))}
-      </SelectContent>
-    </Select>
+      </DropdownMenuContent>
+    </DropdownMenu>
   );
 }

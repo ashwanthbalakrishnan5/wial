@@ -13,6 +13,8 @@ import { toast } from "sonner";
 import { Switch } from "@repo/ui/switch";
 import { Loader2, Plus, X } from "lucide-react";
 import type { Tables } from "@repo/types";
+import { BrandingPreview } from "@/components/dashboard/branding-preview";
+import { useTranslations } from "next-intl";
 
 type Chapter = Tables<"chapters">;
 
@@ -44,26 +46,11 @@ export function SettingsClient({
 }) {
   const router = useRouter();
   const [loading, setLoading] = useState(false);
+  const t = useTranslations("settings");
+  const tc = useTranslations("common");
 
   // Branding state
-  const [primaryColor, setPrimaryColor] = useState(chapter.brand_primary_color);
-  const [secondaryColor, setSecondaryColor] = useState(chapter.brand_secondary_color);
-  const [accentColor, setAccentColor] = useState(chapter.brand_accent_color);
-  const [font, setFont] = useState(chapter.brand_font);
-
-  // Contact state
-  const [contactEmail, setContactEmail] = useState(chapter.contact_email ?? "");
-  const [contactPhone, setContactPhone] = useState(chapter.contact_phone ?? "");
-  const [contactAddress, setContactAddress] = useState(chapter.contact_address ?? "");
-
-  // Languages state
-  const [activeLanguages, setActiveLanguages] = useState<string[]>(
-    chapter.active_languages
-  );
-
-  // AI Coach Matching state
-  const [aiMatching, setAiMatching] = useState(aiCoachMatchingEnabled);
-
+...
   async function handleSaveBranding() {
     setLoading(true);
     const supabase = createClient();
@@ -120,137 +107,96 @@ export function SettingsClient({
     }
     setLoading(false);
   }
-
-  async function handleSaveAiMatching(enabled: boolean) {
-    setLoading(true);
-    setAiMatching(enabled);
-    const supabase = createClient();
-
-    // Upsert the content block for ai_coach_matching_enabled
-    const { error } = await supabase
-      .from("content_blocks")
-      .upsert(
-        {
-          chapter_id: chapter.id,
-          block_key: "ai_coach_matching_enabled",
-          locale: chapter.default_language,
-          content_type: "plain_text",
-          content: enabled ? "true" : "false",
-        },
-        { onConflict: "chapter_id,block_key,locale" }
-      );
-
-    if (error) {
-      toast.error(error.message);
-      setAiMatching(!enabled); // revert
-    } else {
-      toast.success(
-        enabled
-          ? "AI Coach Matching enabled."
-          : "AI Coach Matching disabled."
-      );
-      router.refresh();
-    }
-    setLoading(false);
-  }
-
-  function addLanguage(code: string) {
-    if (!activeLanguages.includes(code)) {
-      setActiveLanguages([...activeLanguages, code]);
-    }
-  }
-
-  function removeLanguage(code: string) {
-    if (code === chapter.default_language) {
-      toast.error("Cannot remove the default language.");
-      return;
-    }
-    setActiveLanguages(activeLanguages.filter((l) => l !== code));
-  }
-
-  const availableToAdd = AVAILABLE_LANGUAGES.filter(
-    (l) => !activeLanguages.includes(l.code)
-  );
-
+...
   return (
     <div className="space-y-6">
       <div>
         <h1 className="text-3xl font-semibold tracking-tight">
-          Chapter Settings
+          {t("title")}
         </h1>
         <p className="text-muted-foreground">
-          Configure {chapter.name}'s branding, contact info, and languages.
+          {t("configure", { name: chapter.name })}
         </p>
       </div>
 
       <Tabs defaultValue="branding">
         <TabsList>
-          <TabsTrigger value="branding">Branding</TabsTrigger>
-          <TabsTrigger value="contact">Contact</TabsTrigger>
-          <TabsTrigger value="languages">Languages</TabsTrigger>
-          <TabsTrigger value="general">General</TabsTrigger>
-          <TabsTrigger value="ai">AI Features</TabsTrigger>
+          <TabsTrigger value="branding">{t("branding")}</TabsTrigger>
+          <TabsTrigger value="contact">{t("contact")}</TabsTrigger>
+          <TabsTrigger value="languages">{t("languages")}</TabsTrigger>
+          <TabsTrigger value="general">{t("general")}</TabsTrigger>
+          <TabsTrigger value="ai">{t("aiFeatures")}</TabsTrigger>
         </TabsList>
 
         <TabsContent value="branding" className="space-y-6">
-          <Card>
-            <CardHeader>
-              <CardTitle>Brand Colors</CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              <div className="grid grid-cols-3 gap-4">
-                {[
-                  { label: "Primary", value: primaryColor, set: setPrimaryColor },
-                  { label: "Secondary", value: secondaryColor, set: setSecondaryColor },
-                  { label: "Accent", value: accentColor, set: setAccentColor },
-                ].map((c) => (
-                  <div key={c.label} className="space-y-2">
-                    <Label>{c.label}</Label>
-                    <div className="flex gap-2">
-                      <input
-                        type="color"
-                        value={c.value}
-                        onChange={(e) => c.set(e.target.value)}
-                        className="h-10 w-10 cursor-pointer rounded border"
-                        disabled={!canEditBranding}
-                      />
-                      <Input
-                        value={c.value}
-                        onChange={(e) => c.set(e.target.value)}
-                        disabled={!canEditBranding}
-                      />
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+            <Card>
+              <CardHeader>
+                <CardTitle>{t("brandColors")}</CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <div className="grid grid-cols-3 gap-4">
+                  {[
+                    { label: t("primary"), value: primaryColor, set: setPrimaryColor },
+                    { label: t("secondary"), value: secondaryColor, set: setSecondaryColor },
+                    { label: t("accent"), value: accentColor, set: setAccentColor },
+                  ].map((c) => (
+                    <div key={c.label} className="space-y-2">
+                      <Label>{c.label}</Label>
+                      <div className="flex gap-2">
+                        <input
+                          type="color"
+                          value={c.value}
+                          onChange={(e) => c.set(e.target.value)}
+                          className="h-10 w-10 cursor-pointer rounded border"
+                          disabled={!canEditBranding}
+                        />
+                        <Input
+                          value={c.value}
+                          onChange={(e) => c.set(e.target.value)}
+                          disabled={!canEditBranding}
+                        />
+                      </div>
                     </div>
-                  </div>
-                ))}
-              </div>
-              <div className="space-y-2">
-                <Label>Font Family</Label>
-                <Input
-                  value={font}
-                  onChange={(e) => setFont(e.target.value)}
-                  disabled={!canEditBranding}
-                />
-              </div>
-              {canEditBranding && (
-                <div className="flex justify-end">
-                  <Button onClick={handleSaveBranding} disabled={loading}>
-                    {loading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-                    Save Branding
-                  </Button>
+                  ))}
                 </div>
-              )}
-            </CardContent>
-          </Card>
+                <div className="space-y-2">
+                  <Label>{t("fontFamily")}</Label>
+                  <Input
+                    value={font}
+                    onChange={(e) => setFont(e.target.value)}
+                    disabled={!canEditBranding}
+                  />
+                </div>
+                {canEditBranding && (
+                  <div className="flex justify-end">
+                    <Button onClick={handleSaveBranding} disabled={loading}>
+                      {loading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                      {t("saveBranding")}
+                    </Button>
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+
+            <BrandingPreview 
+              name={chapter.name}
+              primaryColor={primaryColor}
+              secondaryColor={secondaryColor}
+              accentColor={accentColor}
+              font={font || "Lexend"}
+            />
+          </div>
         </TabsContent>
 
         <TabsContent value="contact" className="space-y-6">
           <Card>
             <CardHeader>
-              <CardTitle>Contact Information</CardTitle>
+              <CardTitle>{t("contactInfo")}</CardTitle>
             </CardHeader>
             <CardContent className="space-y-4">
               <div className="space-y-2">
-                <Label>Email</Label>
+                <Label>{t("email")}</Label>
                 <Input
                   type="email"
                   value={contactEmail}
@@ -258,14 +204,14 @@ export function SettingsClient({
                 />
               </div>
               <div className="space-y-2">
-                <Label>Phone</Label>
+                <Label>{t("phone")}</Label>
                 <Input
                   value={contactPhone}
                   onChange={(e) => setContactPhone(e.target.value)}
                 />
               </div>
               <div className="space-y-2">
-                <Label>Address</Label>
+                <Label>{t("address")}</Label>
                 <Input
                   value={contactAddress}
                   onChange={(e) => setContactAddress(e.target.value)}
@@ -274,7 +220,7 @@ export function SettingsClient({
               <div className="flex justify-end">
                 <Button onClick={handleSaveContact} disabled={loading}>
                   {loading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-                  Save Contact Info
+                  {t("saveContactInfo")}
                 </Button>
               </div>
             </CardContent>
@@ -284,13 +230,11 @@ export function SettingsClient({
         <TabsContent value="languages" className="space-y-6">
           <Card>
             <CardHeader>
-              <CardTitle>Active Languages</CardTitle>
+              <CardTitle>{t("activeLanguages")}</CardTitle>
             </CardHeader>
             <CardContent className="space-y-4">
               <p className="text-sm text-muted-foreground">
-                Manage the languages your chapter publishes content in.
-                Translated content can be created using AI translation or
-                written manually.
+                {t("manageLanguages")}
               </p>
               <div className="flex flex-wrap gap-2">
                 {activeLanguages.map((code) => {
@@ -305,7 +249,7 @@ export function SettingsClient({
                       {lang?.name ?? code.toUpperCase()}
                       {isDefault && (
                         <span className="ml-1 text-xs text-muted-foreground">
-                          (default)
+                          ({tc("default")})
                         </span>
                       )}
                       {!isDefault && (
@@ -334,7 +278,7 @@ export function SettingsClient({
                     }}
                   >
                     <option value="" disabled>
-                      Add a language...
+                      {t("addLanguage")}
                     </option>
                     {availableToAdd.map((l) => (
                       <option key={l.code} value={l.code}>
@@ -347,7 +291,7 @@ export function SettingsClient({
               <div className="flex justify-end">
                 <Button onClick={handleSaveLanguages} disabled={loading}>
                   {loading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-                  Save Languages
+                  {t("saveLanguages")}
                 </Button>
               </div>
             </CardContent>
@@ -357,36 +301,36 @@ export function SettingsClient({
         <TabsContent value="general" className="space-y-6">
           <Card>
             <CardHeader>
-              <CardTitle>General Information</CardTitle>
+              <CardTitle>{t("generalInfo")}</CardTitle>
             </CardHeader>
             <CardContent className="space-y-4">
               <div className="space-y-2">
-                <Label>Chapter Name</Label>
+                <Label>{t("chapterName")}</Label>
                 <Input value={chapter.name} disabled />
                 <p className="text-xs text-muted-foreground">
-                  Contact a Super Admin to change the chapter name.
+                  {t("contactAdmin")}
                 </p>
               </div>
               <div className="space-y-2">
-                <Label>Slug</Label>
+                <Label>{t("slug")}</Label>
                 <Input value={chapter.slug} disabled />
               </div>
               <div className="space-y-2">
-                <Label>Subdomain</Label>
+                <Label>{t("subdomain")}</Label>
                 <Input
                   value={`${chapter.subdomain}.wial.ashwanthbk.com`}
                   disabled
                 />
               </div>
               <div className="space-y-2">
-                <Label>Status</Label>
+                <Label>{t("status")}</Label>
                 <Badge
                   variant={
                     chapter.status === "active"
                       ? "default"
                       : chapter.status === "suspended"
-                        ? "secondary"
-                        : "destructive"
+                        ? "destructive"
+                        : "outline"
                   }
                 >
                   {chapter.status}
@@ -399,20 +343,17 @@ export function SettingsClient({
         <TabsContent value="ai" className="space-y-6">
           <Card>
             <CardHeader>
-              <CardTitle>AI Coach Matching</CardTitle>
+              <CardTitle>{t("aiCoachMatching")}</CardTitle>
             </CardHeader>
             <CardContent className="space-y-4">
               <p className="text-sm text-muted-foreground">
-                When enabled, your chapter's coach directory page shows a "Find
-                Your Coach" widget that uses AI to match visitors with the right
-                coach based on their needs.
+                {t("aiCoachMatchingDesc")}
               </p>
               <div className="flex items-center justify-between rounded-lg border p-4">
                 <div className="space-y-0.5">
-                  <Label>Enable AI Coach Matching widget</Label>
+                  <Label>{t("aiCoachMatchingWidget")}</Label>
                   <p className="text-xs text-muted-foreground">
-                    Visitors can describe what they need and get personalized
-                    coach recommendations.
+                    {t("aiCoachMatchingWidgetDesc")}
                   </p>
                 </div>
                 <Switch

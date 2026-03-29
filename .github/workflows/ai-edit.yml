@@ -62,19 +62,22 @@ jobs:
         run: |
           CHAPTER_DIR="apps/chapter-${{ inputs.chapter_slug }}"
 
-          # Fall back to chapter-template if per-chapter folder doesn't exist yet
           if [ ! -d "$CHAPTER_DIR" ]; then
-            CHAPTER_DIR="apps/chapter-template"
+            echo "Error: Chapter folder $CHAPTER_DIR does not exist"
+            exit 1
           fi
 
           echo "Working directory: $CHAPTER_DIR"
 
-          # Collect context: list the chapter files for the AI
-          FILE_LIST=$(find "$CHAPTER_DIR/src" -type f \( -name "*.astro" -o -name "*.ts" -o -name "*.css" \) 2>/dev/null | head -50)
+          # Collect context: chapter files for the AI
+          CHAPTER_FILES=$(find "$CHAPTER_DIR/src" -type f \( -name "*.astro" -o -name "*.ts" -o -name "*.css" \) 2>/dev/null | head -40)
 
-          # Read key files for context (limited to avoid token overflow)
+          # Also collect template-core files so the AI knows what shared components exist
+          TEMPLATE_CORE_FILES=$(find "packages/template-core/src" -type f \( -name "*.astro" -o -name "*.ts" \) 2>/dev/null | head -30)
+
+          # Read chapter files for context (limited to avoid token overflow)
           CONTEXT=""
-          for f in $FILE_LIST; do
+          for f in $CHAPTER_FILES; do
             if [ -f "$f" ]; then
               CONTENT=$(head -100 "$f")
               CONTEXT="$CONTEXT
@@ -84,15 +87,28 @@ jobs:
             fi
           done
 
+          # Read template-core files as read-only reference context
+          TEMPLATE_CONTEXT=""
+          for f in $TEMPLATE_CORE_FILES; do
+            if [ -f "$f" ]; then
+              CONTENT=$(head -80 "$f")
+              TEMPLATE_CONTEXT="$TEMPLATE_CONTEXT
+
+          --- SHARED (read-only): $f ---
+          $CONTENT"
+            fi
+          done
+
           # Call Gemini API to generate edits
           ESCAPED_PROMPT=$(echo "${{ inputs.prompt_text }}" | jq -Rs .)
           ESCAPED_CONTEXT=$(echo "$CONTEXT" | jq -Rs .)
+          ESCAPED_TEMPLATE_CONTEXT=$(echo "$TEMPLATE_CONTEXT" | jq -Rs .)
 
           REQUEST_BODY=$(cat <<GEMINI_EOF
           {
             "contents": [{
               "parts": [{
-                "text": "You are an expert Astro/web developer. You are editing a WIAL chapter website.\n\nThe user wants the following change:\n${ESCAPED_PROMPT//\"/\\\"}\n\nHere are the current files in the chapter directory:\n${ESCAPED_CONTEXT//\"/\\\"}\n\nRespond with a JSON array of file edits. Each edit object has:\n- \"path\": the file path relative to the repo root\n- \"content\": the complete new file content\n\nOnly include files that need changes. Return valid JSON only, no markdown fences."
+                "text": "You are an expert Astro/web developer. You are editing a WIAL chapter website.\n\nThe user wants the following change:\n${ESCAPED_PROMPT//\"/\\\"}\n\nHere are the current files in the chapter directory (you may edit these):\n${ESCAPED_CONTEXT//\"/\\\"}\n\nHere are shared template-core files (READ-ONLY reference — you can import from these but must NOT edit them):\n${ESCAPED_TEMPLATE_CONTEXT//\"/\\\"}\n\nIMPORTANT RULES:\n- Only create or modify files inside apps/chapter-${{ inputs.chapter_slug }}/\n- You can import shared components from @repo/template-core (e.g., layouts, components, utilities)\n- Do NOT output edits to packages/template-core/ or any other directory\n\nRespond with a JSON array of file edits. Each edit object has:\n- \"path\": the file path relative to the repo root (must start with apps/chapter-${{ inputs.chapter_slug }}/)\n- \"content\": the complete new file content\n\nOnly include files that need changes. Return valid JSON only, no markdown fences."
               }]
             }],
             "generationConfig": {
@@ -118,20 +134,20 @@ jobs:
             exit 1
           fi
 
-          # Apply edits
+          # Apply edits — strictly scoped to this chapter's folder only
           echo "$EDITS" | jq -c '.[]' | while read -r edit; do
             FILE_PATH=$(echo "$edit" | jq -r '.path')
             FILE_CONTENT=$(echo "$edit" | jq -r '.content')
 
-            # Security: ensure edits are scoped to the chapter directory or packages/template-core
+            # Security: edits MUST be inside this chapter's directory only
             case "$FILE_PATH" in
-              apps/chapter-${{ inputs.chapter_slug }}/*|apps/chapter-template/*)
+              apps/chapter-${{ inputs.chapter_slug }}/*)
                 echo "Applying edit to: $FILE_PATH"
                 mkdir -p "$(dirname "$FILE_PATH")"
                 echo "$FILE_CONTENT" > "$FILE_PATH"
                 ;;
               *)
-                echo "BLOCKED: Edit to $FILE_PATH is outside allowed scope"
+                echo "BLOCKED: Edit to $FILE_PATH is outside allowed scope (must be in apps/chapter-${{ inputs.chapter_slug }}/)"
                 ;;
             esac
           done

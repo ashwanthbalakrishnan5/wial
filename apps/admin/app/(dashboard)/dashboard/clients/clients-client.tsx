@@ -18,6 +18,7 @@ import {
 import { toast } from "sonner";
 import { Plus, Pencil, Trash2, Loader2, Building, ExternalLink } from "lucide-react";
 import type { Tables } from "@repo/types";
+import { useTranslations } from "next-intl";
 
 type ClientOrg = Tables<"client_organizations">;
 
@@ -34,6 +35,8 @@ export function ClientOrgsClient({
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editing, setEditing] = useState<ClientOrg | null>(null);
   const [loading, setLoading] = useState(false);
+  const t = useTranslations("clients");
+  const tc = useTranslations("common");
 
   const [name, setName] = useState("");
   const [logoUrl, setLogoUrl] = useState("");
@@ -126,16 +129,16 @@ export function ClientOrgsClient({
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-3xl font-semibold tracking-tight">
-            Client Organizations
+            {t("title")}
           </h1>
           <p className="text-muted-foreground">
-            Manage partner and client logos displayed on your website.
+            {t("description")}
           </p>
         </div>
         {canManage && (
           <Button onClick={openCreate}>
             <Plus className="mr-2 h-4 w-4" />
-            Add Client
+            {t("addClient")}
           </Button>
         )}
       </div>
@@ -143,14 +146,14 @@ export function ClientOrgsClient({
       {clients.length === 0 ? (
         <div className="flex flex-col items-center justify-center rounded-lg border border-dashed p-12 text-center">
           <Building className="h-12 w-12 text-muted-foreground" />
-          <h3 className="mt-4 text-lg font-semibold">No clients yet</h3>
+          <h3 className="mt-4 text-lg font-semibold">{t("noClients")}</h3>
           <p className="mt-1 text-sm text-muted-foreground">
-            Add client organizations to showcase on your chapter website.
+            {t("noClientsDesc")}
           </p>
           {canManage && (
             <Button onClick={openCreate} className="mt-4">
               <Plus className="mr-2 h-4 w-4" />
-              Add Client
+              {t("addClient")}
             </Button>
           )}
         </div>
@@ -167,11 +170,11 @@ export function ClientOrgsClient({
                     <img
                       src={c.logo_url}
                       alt={c.name}
-                      className="h-12 w-12 rounded-md object-contain border"
+                      className="h-20 w-20 rounded-md object-contain border"
                     />
                   ) : (
-                    <div className="flex h-12 w-12 items-center justify-center rounded-md bg-muted text-muted-foreground">
-                      <Building className="h-6 w-6" />
+                    <div className="flex h-20 w-20 items-center justify-center rounded-md bg-muted text-muted-foreground">
+                      <Building className="h-8 w-8" />
                     </div>
                   )}
                   <div>
@@ -183,7 +186,7 @@ export function ClientOrgsClient({
                         rel="noopener noreferrer"
                         className="text-xs text-primary hover:underline inline-flex items-center gap-0.5"
                       >
-                        Website <ExternalLink className="h-3 w-3" />
+                        {tc("websiteUrl") || "Website"} <ExternalLink className="h-3 w-3" />
                       </a>
                     )}
                   </div>
@@ -207,7 +210,7 @@ export function ClientOrgsClient({
                     onClick={() => openEdit(c)}
                   >
                     <Pencil className="mr-1 h-3.5 w-3.5" />
-                    Edit
+                    {tc("edit")}
                   </Button>
                   <Button
                     variant="ghost"
@@ -216,7 +219,7 @@ export function ClientOrgsClient({
                     className="text-destructive hover:text-destructive"
                   >
                     <Trash2 className="mr-1 h-3.5 w-3.5" />
-                    Remove
+                    {tc("remove")}
                   </Button>
                 </div>
               )}
@@ -229,12 +232,12 @@ export function ClientOrgsClient({
         <DialogContent>
           <DialogHeader>
             <DialogTitle>
-              {editing ? "Edit Client" : "Add Client"}
+              {editing ? t("editClient") : t("addClient")}
             </DialogTitle>
           </DialogHeader>
           <div className="space-y-4">
             <div className="space-y-2">
-              <Label>Organization Name *</Label>
+              <Label>{t("orgName")}</Label>
               <Input
                 value={name}
                 onChange={(e) => setName(e.target.value)}
@@ -242,7 +245,7 @@ export function ClientOrgsClient({
               />
             </div>
             <div className="space-y-2">
-              <Label>Logo URL</Label>
+              <Label>{t("logoUrl")}</Label>
               <Input
                 value={logoUrl}
                 onChange={(e) => setLogoUrl(e.target.value)}
@@ -252,12 +255,12 @@ export function ClientOrgsClient({
                 <img
                   src={logoUrl}
                   alt="Logo preview"
-                  className="h-16 w-16 rounded-md object-contain border"
+                  className="h-20 w-20 rounded-md object-contain border"
                 />
               )}
             </div>
             <div className="space-y-2">
-              <Label>Website URL</Label>
+              <Label>{t("websiteUrl")}</Label>
               <Input
                 value={websiteUrl}
                 onChange={(e) => setWebsiteUrl(e.target.value)}
@@ -265,7 +268,7 @@ export function ClientOrgsClient({
               />
             </div>
             <div className="space-y-2">
-              <Label>Description</Label>
+              <Label>{tc("description") || t("description")}</Label>
               <Textarea
                 value={description}
                 onChange={(e) => setDescription(e.target.value)}
@@ -274,7 +277,7 @@ export function ClientOrgsClient({
             </div>
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-2">
-                <Label>Sort Order</Label>
+                <Label>{t("sortOrder")}</Label>
                 <Input
                   type="number"
                   value={sortOrder}
@@ -283,17 +286,17 @@ export function ClientOrgsClient({
               </div>
               <div className="flex items-center gap-3 pt-6">
                 <Switch checked={isActive} onCheckedChange={setIsActive} />
-                <Label>Active</Label>
+                <Label>{tc("active")}</Label>
               </div>
             </div>
           </div>
           <DialogFooter>
             <Button variant="ghost" onClick={() => setDialogOpen(false)}>
-              Cancel
+              {tc("cancel")}
             </Button>
             <Button onClick={handleSave} disabled={loading || !name}>
               {loading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-              {editing ? "Save Changes" : "Add Client"}
+              {editing ? tc("saveChanges") : t("addClient")}
             </Button>
           </DialogFooter>
         </DialogContent>

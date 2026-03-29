@@ -5,13 +5,10 @@ import { CoachEditForm } from "./coach-edit-form";
 
 export default async function CoachDetailPage({
   params,
-  searchParams,
 }: {
   params: Promise<{ id: string }>;
-  searchParams: Promise<{ chapter?: string }>;
 }) {
   const { id } = await params;
-  const { chapter: chapterId } = await searchParams;
   const user = await getAuthUser();
   if (!user) redirect("/login");
 

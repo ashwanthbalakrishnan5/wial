@@ -1,0 +1,29 @@
+---
+interface Props {
+  className?: string;
+  color?: string;
+}
+
+const { className = "", color = "var(--color-brand-primary)" } = Astro.props;
+---
+<div class={`absolute pointer-events-none opacity-15 overflow-hidden ${className}`} aria-hidden="true">
+  <svg viewBox="0 0 1000 60" fill="none" xmlns="http://www.w3.org/2000/svg" preserveAspectRatio="none" class="w-full h-full" style={`stroke: ${color};`}>
+    <path d="M-100 50 C 150 45, 400 55, 600 40 S 850 30, 1100 48" stroke-width="1.5" stroke-linecap="round" class="animate-draw-line" style="stroke-dasharray: 1500; stroke-dashoffset: 1500;" />
+  </svg>
+</div>
+
+<style>
+  .animate-draw-line {
+    animation: draw 2s ease-out forwards;
+    animation-delay: 0.5s;
+    stroke-dashoffset: 0 !important;
+  }
+  @keyframes draw {
+    from {
+      stroke-dashoffset: 1500;
+    }
+    to {
+      stroke-dashoffset: 0;
+    }
+  }
+</style>

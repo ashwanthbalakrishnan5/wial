@@ -1,0 +1,64 @@
+---
+import BaseLayout from "@repo/template-core/layouts/BaseLayout.astro";
+import { getChapterData } from "@repo/template-core/lib/data";
+import { getBlock } from "@repo/template-core/lib/content";
+
+export async function getStaticPaths() {
+  const slug = import.meta.env.CHAPTER_SLUG;
+  const { chapter } = await getChapterData(slug);
+  return chapter.active_languages.map((lang: string) => ({
+    params: { locale: lang },
+  }));
+}
+
+const { locale } = Astro.params;
+const slug = import.meta.env.CHAPTER_SLUG;
+const { chapter, contentBlocks } = await getChapterData(slug, locale);
+
+const title = getBlock(contentBlocks, "about_title", `About ${chapter.name}`);
+const body = getBlock(contentBlocks, "about_body", "");
+const mission = getBlock(contentBlocks, "about_mission", "");
+const imageUrl = getBlock(contentBlocks, "about_image_url", "");
+---
+
+<BaseLayout title="About" locale={locale}>
+  {/* Hero Banner */}
+  <section class="bg-brand-primary-light py-16 md:py-20">
+    <div class="mx-auto max-w-[1200px] px-4 sm:px-6 text-center">
+      <h1 class="text-4xl md:text-5xl font-bold font-heading" style="color:var(--color-brand-primary)">
+        {title}
+      </h1>
+    </div>
+  </section>
+
+  {/* Content */}
+  <section class="py-12 md:py-16">
+    <div class="mx-auto max-w-[1200px] px-4 sm:px-6">
+      <div class="max-w-[42rem] mx-auto">
+        {body && (
+          <div class="prose mb-10" set:html={body} />
+        )}
+
+        {mission && (
+          <blockquote class="border-l-4 border-brand-accent bg-brand-accent-light/30 rounded-r-xl px-6 py-5 my-10">
+            <p class="text-lg italic text-text-primary leading-relaxed" set:html={mission} />
+          </blockquote>
+        )}
+      </div>
+
+      {imageUrl && (
+        <div class="max-w-2xl mx-auto mt-10">
+          <img
+            src={imageUrl}
+            alt={`About ${chapter.name}`}
+            class="w-full rounded-2xl shadow-lg transform rotate-1 object-cover"
+            style={`box-shadow: 4px 4px 0 var(--color-brand-primary-light), 8px 8px 24px rgba(0,0,0,0.08)`}
+            loading="lazy"
+            width="800"
+            height="600"
+          />
+        </div>
+      )}
+    </div>
+  </section>
+</BaseLayout>

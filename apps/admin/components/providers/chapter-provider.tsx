@@ -1,11 +1,6 @@
 "use client";
 
-import {
-  createContext,
-  useContext,
-  useCallback,
-} from "react";
-import { useRouter, useSearchParams, usePathname } from "next/navigation";
+import { createContext, useContext, useState, useCallback } from "react";
 import type { Tables } from "@repo/types";
 
 export type Chapter = Tables<"chapters">;
@@ -26,36 +21,31 @@ const ChapterContext = createContext<ChapterContextType>({
 
 export function ChapterProvider({
   chapters,
+  resolvedChapterId,
   children,
 }: {
   chapters: Chapter[];
+  resolvedChapterId: string | null;
   children: React.ReactNode;
 }) {
-  const router = useRouter();
-  const pathname = usePathname();
-  const searchParams = useSearchParams();
+  const [chapterId, setChapterId] = useState<string | null>(resolvedChapterId);
 
-  const selectedChapterId = searchParams.get("chapter") ?? null;
   const selectedChapter =
-    chapters.find((c) => c.id === selectedChapterId) ?? null;
+    chapters.find((c) => c.id === chapterId) ?? null;
 
   const setSelectedChapterId = useCallback(
     (id: string | null) => {
-      const params = new URLSearchParams(searchParams.toString());
-      if (id) {
-        params.set("chapter", id);
-      } else {
-        params.delete("chapter");
-      }
-      router.push(`${pathname}?${params.toString()}`);
+      setChapterId(id);
+      // Persist to cookie so server components can read it
+      document.cookie = `selected-chapter=${id ?? ""}; path=/; max-age=${60 * 60 * 24 * 365}; SameSite=Lax`;
     },
-    [router, pathname, searchParams]
+    []
   );
 
   return (
     <ChapterContext.Provider
       value={{
-        selectedChapterId,
+        selectedChapterId: chapterId,
         selectedChapter,
         chapters,
         setSelectedChapterId,

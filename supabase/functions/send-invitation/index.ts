@@ -1,7 +1,7 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { corsHeaders } from "../_shared/cors.ts";
+import { sendEmail, emailLayout, escapeHtml } from "../_shared/email.ts";
 
-const RESEND_API_KEY = Deno.env.get("RESEND_API_KEY");
 const ADMIN_URL =
   Deno.env.get("ADMIN_DASHBOARD_URL") ?? "https://wial-admin.vercel.app";
 
@@ -99,64 +99,38 @@ Deno.serve(async (req) => {
 
     const signupUrl = `${ADMIN_URL}/signup?token=${invitation.token}`;
 
-    // Send email via Resend
-    if (RESEND_API_KEY) {
-      const emailRes = await fetch("https://api.resend.com/emails", {
-        method: "POST",
-        headers: {
-          Authorization: `Bearer ${RESEND_API_KEY}`,
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          from: "WIAL Platform <noreply@wial.ashwanthbk.com>",
-          to: [invitation.email],
-          subject: `You're invited to join ${chapterName}`,
-          html: `
-            <div style="font-family: 'Source Sans 3', Arial, sans-serif; max-width: 560px; margin: 0 auto; padding: 32px 24px;">
-              <h1 style="font-family: Lexend, sans-serif; color: #1A7A8A; font-size: 24px; margin-bottom: 16px;">
-                You've been invited to ${chapterName}
-              </h1>
-              <p style="color: #374151; font-size: 16px; line-height: 1.6;">
-                You've been invited to join <strong>${chapterName}</strong> as a <strong>${roleLabel}</strong>
-                on the WIAL Global Chapter Network Platform.
-              </p>
-              <p style="color: #374151; font-size: 16px; line-height: 1.6;">
-                Click the button below to create your account. This invitation expires in 7 days.
-              </p>
-              <div style="text-align: center; margin: 32px 0;">
-                <a href="${signupUrl}"
-                   style="display: inline-block; background-color: #1A7A8A; color: white; padding: 12px 32px; border-radius: 8px; text-decoration: none; font-weight: 600; font-size: 16px;">
-                  Create Your Account
-                </a>
-              </div>
-              <p style="color: #6B7280; font-size: 14px;">
-                If the button doesn't work, copy and paste this link into your browser:<br/>
-                <a href="${signupUrl}" style="color: #1A7A8A;">${signupUrl}</a>
-              </p>
-              <hr style="border: none; border-top: 1px solid #E5E7EB; margin: 24px 0;" />
-              <p style="color: #9CA3AF; font-size: 12px;">
-                WIAL Global Chapter Network Platform
-              </p>
-            </div>
-          `,
-        }),
-      });
+    // Send email via shared email utilities
+    const primary = "#1A7A8A";
+    const invitationBody = `
+      <h1 style="font-family:Lexend,sans-serif;color:${primary};font-size:24px;margin:0 0 16px;">
+        You've been invited to ${escapeHtml(chapterName)}
+      </h1>
+      <p>You've been invited to join <strong>${escapeHtml(chapterName)}</strong> as a <strong>${escapeHtml(roleLabel)}</strong> on the WIAL Global Chapter Network Platform.</p>
+      <p>Click the button below to create your account. This invitation expires in 7 days.</p>
+      <div style="text-align:center;margin:32px 0;">
+        <a href="${signupUrl}" style="display:inline-block;background-color:${primary};color:white;padding:12px 32px;border-radius:8px;text-decoration:none;font-weight:600;font-size:16px;">
+          Create Your Account
+        </a>
+      </div>
+      <p style="color:#6B7280;font-size:14px;">
+        If the button doesn't work, copy and paste this link into your browser:<br/>
+        <a href="${signupUrl}" style="color:${primary};">${signupUrl}</a>
+      </p>`;
 
-      if (!emailRes.ok) {
-        const errBody = await emailRes.text();
-        console.error("Resend error:", errBody);
-        return new Response(
-          JSON.stringify({ error: "Failed to send email", details: errBody }),
-          {
-            status: 502,
-            headers: { ...corsHeaders, "Content-Type": "application/json" },
-          }
-        );
-      }
-    } else {
-      // No Resend key — log the signup URL for development
-      console.log(`[DEV] Invitation email for ${invitation.email}:`);
-      console.log(`[DEV] Signup URL: ${signupUrl}`);
+    const result = await sendEmail({
+      to: invitation.email,
+      subject: `You're invited to join ${chapterName}`,
+      html: emailLayout(invitationBody, { chapterName }),
+    });
+
+    if (!result.success) {
+      return new Response(
+        JSON.stringify({ error: "Failed to send email", details: result.error }),
+        {
+          status: 502,
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        }
+      );
     }
 
     return new Response(JSON.stringify({ success: true, signupUrl }), {

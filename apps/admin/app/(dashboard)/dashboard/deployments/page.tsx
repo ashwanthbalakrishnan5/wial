@@ -3,23 +3,17 @@ import { createClient } from "@repo/supabase/server";
 import { redirect } from "next/navigation";
 import { DeploymentsClient } from "./deployments-client";
 
-export default async function DeploymentsPage({
-  searchParams,
-}: {
-  searchParams: Promise<{ chapter?: string }>;
-}) {
+export default async function DeploymentsPage() {
   const user = await getAuthUser();
   if (!user) redirect("/login");
 
-  const { chapter: chapterId } = await searchParams;
   const supabase = await createClient();
 
-  // Determine which chapter to show
-  let resolvedChapterId = chapterId;
-  if (!resolvedChapterId && !isSuperAdmin(user.roles)) {
-    const firstChapterRole = user.roles.find((r) => r.chapter_id);
-    resolvedChapterId = firstChapterRole?.chapter_id ?? undefined;
-  }
+  // Auto-resolve chapter from user roles
+  const isAdmin = isSuperAdmin(user.roles);
+  const resolvedChapterId = !isAdmin
+    ? user.roles.find((r) => r.chapter_id)?.chapter_id ?? undefined
+    : undefined;
 
   if (!resolvedChapterId) {
     return (

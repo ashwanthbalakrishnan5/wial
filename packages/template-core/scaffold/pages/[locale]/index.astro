@@ -1,0 +1,141 @@
+---
+import BaseLayout from "@repo/template-core/layouts/BaseLayout.astro";
+import HeroSection from "@repo/template-core/components/HeroSection.astro";
+import StatsStrip from "@repo/template-core/components/StatsStrip.astro";
+import CoachCard from "@repo/template-core/components/CoachCard.astro";
+import TestimonialCard from "@repo/template-core/components/TestimonialCard.astro";
+import { getChapterData } from "@repo/template-core/lib/data";
+import { getBlock } from "@repo/template-core/lib/content";
+
+export async function getStaticPaths() {
+  const slug = import.meta.env.CHAPTER_SLUG;
+  const { chapter } = await getChapterData(slug);
+  return chapter.active_languages.map((lang: string) => ({
+    params: { locale: lang },
+  }));
+}
+
+const { locale } = Astro.params;
+const slug = import.meta.env.CHAPTER_SLUG;
+const { chapter, contentBlocks, coaches, featuredCoaches, featuredTestimonials } =
+  await getChapterData(slug, locale);
+
+const heroTitle = getBlock(contentBlocks, "hero_title", `Welcome to ${chapter.name}`);
+const heroSubtitle = getBlock(contentBlocks, "hero_subtitle", "");
+const heroDescription = getBlock(contentBlocks, "hero_description", "");
+const heroCtaText = getBlock(contentBlocks, "hero_cta_text", "Learn More");
+const heroCtaLink = getBlock(contentBlocks, "hero_cta_link", `/${locale}/about`);
+const heroImageUrl = getBlock(contentBlocks, "hero_image_url", "");
+
+const aboutBody = getBlock(contentBlocks, "about_body", "");
+const aboutImageUrl = getBlock(contentBlocks, "about_image_url", "");
+const aboutTeaser = aboutBody.replace(/<[^>]+>/g, "").substring(0, 300).trim();
+
+const stats = [
+  { value: `${coaches.length}+`, label: "Certified Coaches" },
+];
+---
+
+<BaseLayout title="Home" locale={locale}>
+  {/* Hero */}
+  <HeroSection
+    title={heroTitle}
+    subtitle={heroSubtitle}
+    description={heroDescription}
+    ctaText={heroCtaText}
+    ctaLink={heroCtaLink}
+    imageUrl={heroImageUrl}
+    chapterName={chapter.name}
+  />
+
+  {/* Stats */}
+  <StatsStrip stats={stats} />
+
+  {/* Featured Coaches */}
+  {featuredCoaches.length > 0 && (
+    <section class="py-16 md:py-20" aria-labelledby="coaches-heading">
+      <div class="mx-auto max-w-[1200px] px-4 sm:px-6">
+        <div class="text-center mb-12">
+          <h2 id="coaches-heading" class="text-3xl font-bold font-heading mb-3">
+            Meet Our Coaches
+          </h2>
+          <p class="text-text-secondary max-w-xl mx-auto">
+            {getBlock(contentBlocks, "coaches_description", "Our certified Action Learning coaches are ready to help you grow.")}
+          </p>
+        </div>
+        <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6 pt-10">
+          {featuredCoaches.map((coach) => (
+            <CoachCard coach={coach} locale={locale} />
+          ))}
+        </div>
+        <div class="text-center mt-8">
+          <a
+            href={`/${locale}/coaches`}
+            class="inline-flex items-center gap-2 text-sm font-medium text-brand-primary hover:text-brand-secondary transition-colors"
+          >
+            View All Coaches
+            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14"/><path d="m12 5 7 7-7 7"/></svg>
+          </a>
+        </div>
+      </div>
+    </section>
+  )}
+
+  {/* Featured Testimonials */}
+  {featuredTestimonials.length > 0 && (
+    <section class="py-16 md:py-20 bg-surface-muted" aria-labelledby="testimonials-heading">
+      <div class="mx-auto max-w-[1200px] px-4 sm:px-6">
+        <div class="text-center mb-10">
+          <h2 id="testimonials-heading" class="text-3xl font-bold font-heading mb-3">
+            What People Say
+          </h2>
+        </div>
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-6 max-w-4xl mx-auto">
+          {featuredTestimonials.map((t) => (
+            <TestimonialCard testimonial={t} />
+          ))}
+        </div>
+      </div>
+    </section>
+  )}
+
+  {/* About Teaser */}
+  {(aboutTeaser || aboutImageUrl) && (
+    <section class="py-16 md:py-20" aria-labelledby="about-teaser-heading">
+      <div class="mx-auto max-w-[1200px] px-4 sm:px-6">
+        <div class="flex flex-col md:flex-row items-center gap-10 md:gap-16">
+          {aboutImageUrl && (
+            <div class="flex-1">
+              <img
+                src={aboutImageUrl}
+                alt={`About ${chapter.name}`}
+                class="w-full rounded-2xl shadow-lg transform rotate-1 object-cover aspect-[4/3]"
+                style={`box-shadow: 4px 4px 0 var(--color-brand-primary-light), 8px 8px 24px rgba(0,0,0,0.08)`}
+                loading="lazy"
+                width="560"
+                height="420"
+              />
+            </div>
+          )}
+          <div class="flex-1">
+            <h2 id="about-teaser-heading" class="text-3xl font-bold font-heading mb-4">
+              About {chapter.name}
+            </h2>
+            {aboutTeaser && (
+              <p class="text-text-secondary leading-relaxed mb-6">
+                {aboutTeaser}{aboutTeaser.length >= 300 ? "..." : ""}
+              </p>
+            )}
+            <a
+              href={`/${locale}/about`}
+              class="inline-flex items-center gap-2 text-sm font-medium text-brand-primary hover:text-brand-secondary transition-colors"
+            >
+              Learn More
+              <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14"/><path d="m12 5 7 7-7 7"/></svg>
+            </a>
+          </div>
+        </div>
+      </div>
+    </section>
+  )}
+</BaseLayout>

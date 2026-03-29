@@ -1,7 +1,7 @@
 ---
-import BaseLayout from "../../layouts/BaseLayout.astro";
-import { getChapterData } from "../../lib/data";
-import { getBlock } from "../../lib/content";
+import BaseLayout from "@repo/template-core/layouts/BaseLayout.astro";
+import { getChapterData } from "@repo/template-core/lib/data";
+import { getBlock } from "@repo/template-core/lib/content";
 
 export async function getStaticPaths() {
   const slug = import.meta.env.CHAPTER_SLUG;
@@ -31,34 +31,36 @@ const imageUrl = getBlock(contentBlocks, "about_image_url", "");
     </div>
   </section>
 
-  {/* Content */}
-  <section class="py-12 md:py-16">
-    <div class="mx-auto max-w-[1200px] px-4 sm:px-6">
-      <div class="max-w-[42rem] mx-auto">
-        {body && (
-          <div class="prose mb-10" set:html={body} />
-        )}
+  {/* Content — only render when there is something to show */}
+  {(body || mission || imageUrl) && (
+    <section class="py-12 md:py-16">
+      <div class="mx-auto max-w-[1200px] px-4 sm:px-6">
+        <div class="max-w-[42rem] mx-auto">
+          {body && (
+            <div class="prose mb-10" set:html={body} />
+          )}
 
-        {mission && (
-          <blockquote class="border-l-4 border-brand-accent bg-brand-accent-light/30 rounded-r-xl px-6 py-5 my-10">
-            <p class="text-lg italic text-text-primary leading-relaxed" set:html={mission} />
-          </blockquote>
+          {mission && (
+            <blockquote class="border-l-4 border-brand-accent bg-brand-accent-light/30 rounded-r-xl px-6 py-5 my-10">
+              <p class="text-lg italic text-text-primary leading-relaxed" set:html={mission} />
+            </blockquote>
+          )}
+        </div>
+
+        {imageUrl && (
+          <div class="max-w-2xl mx-auto mt-10">
+            <img
+              src={imageUrl}
+              alt={`About ${chapter.name}`}
+              class="w-full rounded-2xl shadow-lg transform rotate-1 object-cover"
+              style={`box-shadow: 4px 4px 0 var(--color-brand-primary-light), 8px 8px 24px rgba(0,0,0,0.08)`}
+              loading="lazy"
+              width="800"
+              height="600"
+            />
+          </div>
         )}
       </div>
-
-      {imageUrl && (
-        <div class="max-w-2xl mx-auto mt-10">
-          <img
-            src={imageUrl}
-            alt={`About ${chapter.name}`}
-            class="w-full rounded-2xl shadow-lg transform rotate-1 object-cover"
-            style={`box-shadow: 4px 4px 0 var(--color-brand-primary-light), 8px 8px 24px rgba(0,0,0,0.08)`}
-            loading="lazy"
-            width="800"
-            height="600"
-          />
-        </div>
-      )}
-    </div>
-  </section>
+    </section>
+  )}
 </BaseLayout>

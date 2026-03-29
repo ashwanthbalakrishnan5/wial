@@ -43,3 +43,8 @@
 - External systems: LMS (don't touch), Credly badges (don't touch), we only track certification levels.
 - 10 chapter pages (was 8): added Events Calendar and Resources & Library.
 - Payments deferred but UI mocked — Stripe Connect + PayPal, SRD pricing ($50 enrollment, $30 certification).
+
+## Test Creds
+
+- Email: admin@wial-test.com
+- Password: TestAdmin123!

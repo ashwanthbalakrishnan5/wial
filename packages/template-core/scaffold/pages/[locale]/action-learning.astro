@@ -1,0 +1,183 @@
+---
+import BaseLayout from "@repo/template-core/layouts/BaseLayout.astro";
+import AccordionItem from "@repo/template-core/components/AccordionItem.astro";
+import { getChapterData } from "@repo/template-core/lib/data";
+import { getBlock, getJsonBlock } from "@repo/template-core/lib/content";
+
+export async function getStaticPaths() {
+  const slug = import.meta.env.CHAPTER_SLUG;
+  const { chapter } = await getChapterData(slug);
+  return chapter.active_languages.map((lang: string) => ({
+    params: { locale: lang },
+  }));
+}
+
+const { locale } = Astro.params;
+const slug = import.meta.env.CHAPTER_SLUG;
+const { contentBlocks } = await getChapterData(slug, locale);
+
+const title = getBlock(contentBlocks, "al_title", "Action Learning");
+const intro = getBlock(contentBlocks, "al_intro", "");
+const solvesTitle = getBlock(contentBlocks, "al_solves_problems_title", "");
+const solvesBody = getBlock(contentBlocks, "al_solves_problems_body", "");
+const spheresTitle = getBlock(contentBlocks, "al_solution_spheres_title", "");
+const spheresBody = getBlock(contentBlocks, "al_solution_spheres_body", "");
+const componentsTitle = getBlock(contentBlocks, "al_components_title", "The 6 Components of Action Learning");
+const componentsIntro = getBlock(contentBlocks, "al_components_intro", "");
+const benefitsTitle = getBlock(contentBlocks, "al_benefits_title", "");
+const benefitsBody = getBlock(contentBlocks, "al_benefits_body", "");
+const ctaText = getBlock(contentBlocks, "al_cta_text", "Get Started");
+const ctaLink = getBlock(contentBlocks, "al_cta_link", `/${locale}/contact`);
+
+interface ALComponent {
+  title: string;
+  description: string;
+}
+const alComponents = getJsonBlock<ALComponent[]>(contentBlocks, "al_components") ?? [];
+
+// Certification section data
+interface CertLevel {
+  level: string;
+  full_name: string;
+  requirements: string;
+  hours_required: number;
+  description?: string;
+}
+const certLevels = getJsonBlock<CertLevel[]>(contentBlocks, "cert_levels_info") ?? [];
+const certRecertInfo = getBlock(contentBlocks, "cert_recertification_info", "");
+const certAppLink = getBlock(contentBlocks, "cert_application_link", "");
+
+const certColors: Record<string, string> = {
+  CALC: "#3b82f6",
+  SALC: "#16a34a",
+  MALC: "#d97706",
+  PALC: "#7c3aed",
+};
+const certOrder = ["CALC", "SALC", "MALC", "PALC"];
+---
+
+<BaseLayout title="Action Learning" locale={locale}>
+  {/* Hero Banner */}
+  <section class="bg-brand-primary-light py-16 md:py-20">
+    <div class="mx-auto max-w-[1200px] px-4 sm:px-6 text-center">
+      <h1 class="text-4xl md:text-5xl font-bold font-heading" style="color:var(--color-brand-primary)">
+        {title}
+      </h1>
+    </div>
+  </section>
+
+  <section class="py-12 md:py-16">
+    <div class="mx-auto max-w-[1200px] px-4 sm:px-6">
+      <div class="max-w-[42rem] mx-auto">
+        {intro && (
+          <div class="prose mb-10" set:html={intro} />
+        )}
+
+        {solvesTitle && (
+          <div class="mb-10">
+            <h2 class="text-2xl font-bold font-heading mb-4">{solvesTitle}</h2>
+            {solvesBody && <div class="prose" set:html={solvesBody} />}
+          </div>
+        )}
+
+        {spheresTitle && (
+          <div class="mb-10">
+            <h2 class="text-2xl font-bold font-heading mb-4">{spheresTitle}</h2>
+            {spheresBody && <div class="prose" set:html={spheresBody} />}
+          </div>
+        )}
+
+        {alComponents.length > 0 && (
+          <div class="mb-10">
+            <h2 class="text-2xl font-bold font-heading mb-3">{componentsTitle}</h2>
+            {componentsIntro && (
+              <div class="prose mb-6" set:html={componentsIntro} />
+            )}
+            <div class="space-y-0">
+              {alComponents.map((comp) => (
+                <AccordionItem title={comp.title} content={comp.description} />
+              ))}
+            </div>
+          </div>
+        )}
+
+        {benefitsTitle && (
+          <div class="mb-10">
+            <h2 class="text-2xl font-bold font-heading mb-4">{benefitsTitle}</h2>
+            {benefitsBody && <div class="prose" set:html={benefitsBody} />}
+          </div>
+        )}
+
+        {ctaText && ctaLink && (
+          <div class="text-center mt-12">
+            <a
+              href={ctaLink}
+              class="inline-block px-8 py-3.5 text-base font-semibold rounded-full bg-brand-accent text-warm-charcoal hover:opacity-90 transition-opacity shadow-md"
+            >
+              {ctaText}
+            </a>
+          </div>
+        )}
+      </div>
+    </div>
+  </section>
+
+  {/* Certification Levels Section */}
+  {certLevels.length > 0 && (
+    <section class="py-12 md:py-16 border-t border-border-subtle">
+      <div class="mx-auto max-w-[1200px] px-4 sm:px-6">
+        <h2 class="text-3xl font-bold font-heading text-center mb-10" style="color:var(--color-brand-primary)">
+          Certification Levels
+        </h2>
+
+        <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
+          {certLevels.map((cert) => {
+            const color = certColors[cert.level] || "#6b7280";
+            const levelIdx = certOrder.indexOf(cert.level);
+            return (
+              <div class="rounded-xl border border-border-subtle bg-white p-5 shadow-sm" style={`border-top:4px solid ${color};`}>
+                <span class="text-xs font-semibold uppercase tracking-wider" style={`color:${color};`}>
+                  {cert.level}
+                </span>
+                <h3 class="text-base font-semibold font-heading mt-1">{cert.full_name}</h3>
+                <p class="text-sm text-text-secondary mt-2">{cert.requirements}</p>
+                {cert.hours_required > 0 && (
+                  <p class="text-sm text-text-muted mt-1">{cert.hours_required}+ hours required</p>
+                )}
+                {/* Progression dots */}
+                <div class="flex items-center gap-1.5 mt-4">
+                  {certOrder.map((_, i) => (
+                    <div
+                      class="h-2 flex-1 rounded-full"
+                      style={`background:${i <= levelIdx ? color : "#e5e7eb"};`}
+                    />
+                  ))}
+                </div>
+              </div>
+            );
+          })}
+        </div>
+
+        {certRecertInfo && (
+          <div class="mt-10 max-w-[42rem] mx-auto rounded-xl border-l-4 p-6 bg-brand-primary-light" style="border-left-color:var(--color-brand-accent);">
+            <div class="prose" set:html={certRecertInfo} />
+          </div>
+        )}
+
+        {certAppLink && (
+          <div class="text-center mt-8">
+            <a
+              href={certAppLink}
+              target="_blank"
+              rel="noopener noreferrer"
+              class="inline-block px-8 py-3.5 text-base font-semibold rounded-full text-white hover:opacity-90 transition-opacity shadow-md"
+              style="background-color:var(--color-brand-primary);"
+            >
+              Begin Your Certification Journey
+            </a>
+          </div>
+        )}
+      </div>
+    </section>
+  )}
+</BaseLayout>

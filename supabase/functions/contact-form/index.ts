@@ -1,4 +1,5 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.49.4";
+import { sendEmail, emailLayout, escapeHtml } from "../_shared/email.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -51,7 +52,6 @@ Deno.serve(async (req) => {
   try {
     const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
     const serviceRoleKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
-    const resendApiKey = Deno.env.get("RESEND_API_KEY");
 
     const body = await req.json();
     const { chapter_slug, name, email, message } = body ?? {};
@@ -111,44 +111,31 @@ Deno.serve(async (req) => {
       );
     }
 
-    // Send email via Resend
-    if (resendApiKey) {
-      const emailRes = await fetch("https://api.resend.com/emails", {
-        method: "POST",
-        headers: {
-          Authorization: `Bearer ${resendApiKey}`,
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          from: "WIAL Platform <noreply@wial.ashwanthbk.com>",
-          to: [chapter.contact_email],
-          reply_to: email,
-          subject: `New contact form message from ${name} — ${chapter.name}`,
-          html: `
-            <p><strong>From:</strong> ${escapeHtml(name)} &lt;${escapeHtml(email)}&gt;</p>
-            <p><strong>Chapter:</strong> ${escapeHtml(chapter.name)}</p>
-            <hr />
-            <p>${escapeHtml(message).replace(/\n/g, "<br>")}</p>
-          `,
-        }),
-      });
+    // Send email via shared email utilities
+    const primary = "#1A7A8A";
+    const body = `
+      <h1 style="font-family:Lexend,sans-serif;color:${primary};font-size:24px;margin:0 0 16px;">
+        New Contact Form Message
+      </h1>
+      <p><strong>From:</strong> ${escapeHtml(name)} &lt;${escapeHtml(email)}&gt;</p>
+      <p><strong>Chapter:</strong> ${escapeHtml(chapter.name)}</p>
+      <hr style="border:none;border-top:1px solid #e5e7eb;margin:16px 0;" />
+      <p>${escapeHtml(message).replace(/\n/g, "<br>")}</p>`;
 
-      if (!emailRes.ok) {
-        const errBody = await emailRes.json().catch(() => ({}));
-        console.error("Resend error:", errBody);
-        return new Response(
-          JSON.stringify({ error: "Failed to send message. Please try again." }),
-          {
-            status: 502,
-            headers: { ...corsHeaders, "Content-Type": "application/json" },
-          }
-        );
-      }
-    } else {
-      // No Resend key — log and succeed silently in development
-      console.log(
-        `[contact-form] No RESEND_API_KEY. Would have emailed ${chapter.contact_email}:`,
-        { name, email, message }
+    const result = await sendEmail({
+      to: chapter.contact_email,
+      replyTo: email,
+      subject: `New contact form message from ${name} — ${chapter.name}`,
+      html: emailLayout(body, { chapterName: chapter.name }),
+    });
+
+    if (!result.success) {
+      return new Response(
+        JSON.stringify({ error: "Failed to send message. Please try again." }),
+        {
+          status: 502,
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        }
       );
     }
 
@@ -170,11 +157,3 @@ Deno.serve(async (req) => {
   }
 });
 
-function escapeHtml(str: string): string {
-  return str
-    .replace(/&/g, "&amp;")
-    .replace(/</g, "&lt;")
-    .replace(/>/g, "&gt;")
-    .replace(/"/g, "&quot;")
-    .replace(/'/g, "&#039;");
-}

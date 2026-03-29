@@ -18,8 +18,9 @@ import { Label } from "@repo/ui/label";
 import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from "@repo/ui/select";
+import { Avatar, AvatarFallback } from "@repo/ui/avatar";
 import { toast } from "sonner";
-import { Plus, Loader2, Trash2 } from "lucide-react";
+import { Plus, Loader2, Trash2, Users, Mail } from "lucide-react";
 
 type RoleWithProfile = {
   id: string;
@@ -38,7 +39,19 @@ type Invitation = {
   status: string;
   expires_at: string;
   created_at: string;
+  inviter: { full_name: string; email: string } | null;
 };
+
+function getInitials(name: string | undefined | null): string {
+  if (!name) return "?";
+  return name
+    .split(" ")
+    .map((w) => w[0])
+    .filter(Boolean)
+    .slice(0, 2)
+    .join("")
+    .toUpperCase();
+}
 
 const roleLabels: Record<string, string> = {
   super_admin: "Super Admin",
@@ -200,10 +213,20 @@ export function UserManagementClient({
         </TabsList>
 
         <TabsContent value="members">
+          {roles.length === 0 ? (
+            <div className="flex flex-col items-center justify-center rounded-lg border border-dashed p-12 text-center">
+              <Users className="h-12 w-12 text-muted-foreground" />
+              <h3 className="mt-4 text-lg font-semibold">No members yet</h3>
+              <p className="mt-1 text-sm text-muted-foreground">
+                Invite team members to collaborate on this chapter.
+              </p>
+            </div>
+          ) : (
           <div className="rounded-md border">
             <Table>
               <TableHeader>
                 <TableRow>
+                  <TableHead className="w-12" />
                   <TableHead>Name</TableHead>
                   <TableHead>Email</TableHead>
                   <TableHead>Role</TableHead>
@@ -211,15 +234,16 @@ export function UserManagementClient({
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {roles.length === 0 ? (
-                  <TableRow>
-                    <TableCell colSpan={4} className="text-center text-muted-foreground py-8">
-                      No members yet.
-                    </TableCell>
-                  </TableRow>
-                ) : (
+                {(
                   roles.map((r) => (
                     <TableRow key={r.id}>
+                      <TableCell>
+                        <Avatar className="h-8 w-8">
+                          <AvatarFallback className="text-xs">
+                            {getInitials((r.profiles as any)?.full_name)}
+                          </AvatarFallback>
+                        </Avatar>
+                      </TableCell>
                       <TableCell className="font-medium">
                         {(r.profiles as any)?.full_name ?? "\u2014"}
                       </TableCell>
@@ -238,33 +262,45 @@ export function UserManagementClient({
               </TableBody>
             </Table>
           </div>
+          )}
         </TabsContent>
 
         <TabsContent value="invitations">
+          {invitations.length === 0 ? (
+            <div className="flex flex-col items-center justify-center rounded-lg border border-dashed p-12 text-center">
+              <Mail className="h-12 w-12 text-muted-foreground" />
+              <h3 className="mt-4 text-lg font-semibold">No invitations yet</h3>
+              <p className="mt-1 text-sm text-muted-foreground">
+                Send an invite to add team members to this chapter.
+              </p>
+            </div>
+          ) : (
           <div className="rounded-md border">
             <Table>
               <TableHeader>
                 <TableRow>
                   <TableHead>Email</TableHead>
                   <TableHead>Role</TableHead>
+                  <TableHead>Invited By</TableHead>
+                  <TableHead>Sent Date</TableHead>
                   <TableHead>Status</TableHead>
                   <TableHead>Expires</TableHead>
                   <TableHead className="w-12" />
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {invitations.length === 0 ? (
-                  <TableRow>
-                    <TableCell colSpan={5} className="text-center text-muted-foreground py-8">
-                      No invitations yet.
-                    </TableCell>
-                  </TableRow>
-                ) : (
+                {(
                   invitations.map((inv) => (
                     <TableRow key={inv.id}>
                       <TableCell className="font-medium">{inv.email}</TableCell>
                       <TableCell>
                         <Badge variant="outline">{roleLabels[inv.role] ?? inv.role}</Badge>
+                      </TableCell>
+                      <TableCell className="text-muted-foreground">
+                        {(inv.inviter as any)?.full_name ?? "\u2014"}
+                      </TableCell>
+                      <TableCell className="text-muted-foreground">
+                        {new Date(inv.created_at).toLocaleDateString()}
                       </TableCell>
                       <TableCell>
                         <Badge
@@ -299,6 +335,7 @@ export function UserManagementClient({
               </TableBody>
             </Table>
           </div>
+          )}
         </TabsContent>
       </Tabs>
     </div>

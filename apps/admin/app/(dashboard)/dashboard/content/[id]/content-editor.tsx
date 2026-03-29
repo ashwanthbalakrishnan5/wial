@@ -1,8 +1,9 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { useRouter } from "next/navigation";
 import { createClient } from "@repo/supabase/client";
+import Link from "next/link";
 import { Button } from "@repo/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@repo/ui/card";
 import { Textarea } from "@repo/ui/textarea";
@@ -24,7 +25,7 @@ import {
   SelectValue,
 } from "@repo/ui/select";
 import { toast } from "sonner";
-import { Loader2, Sparkles, Languages } from "lucide-react";
+import { Loader2, Sparkles, Languages, ChevronRight, CheckCircle2, Replace, Trash2 } from "lucide-react";
 import { TiptapEditor } from "@/components/tiptap-editor";
 import { ResourcesEditor } from "@/components/resources-editor";
 import type { Tables } from "@repo/types";
@@ -33,6 +34,26 @@ type ContentBlock = Tables<"content_blocks">;
 
 function humanizeKey(key: string): string {
   return key.replace(/_/g, " ").replace(/\b\w/g, (l) => l.toUpperCase());
+}
+
+const pageGroups: Record<string, string> = {
+  hero: "Landing Page",
+  about: "About Page",
+  al: "Action Learning Page",
+  cert: "Certification",
+  coaches: "Coach Directory",
+  testimonials: "Testimonials Page",
+  events: "Events Page",
+  resources: "Resources Page",
+  contact: "Contact Page",
+  join: "Membership Page",
+  nav: "Header Navigation",
+  footer: "Footer",
+};
+
+function getPageGroup(blockKey: string): string {
+  const prefix = blockKey.split("_")[0]!;
+  return pageGroups[prefix] ?? "Other";
 }
 
 const contentTypeOptions = [
@@ -57,6 +78,21 @@ export function ContentEditor({
   const [content, setContent] = useState(block.content);
   const [loading, setLoading] = useState(false);
   const [jsonError, setJsonError] = useState<string | null>(null);
+  const [jsonValid, setJsonValid] = useState(false);
+
+  // Track unsaved changes
+  const hasChanges = content !== block.content;
+
+  // Warn on navigate away with unsaved changes
+  useEffect(() => {
+    const handler = (e: BeforeUnloadEvent) => {
+      if (hasChanges) {
+        e.preventDefault();
+      }
+    };
+    window.addEventListener("beforeunload", handler);
+    return () => window.removeEventListener("beforeunload", handler);
+  }, [hasChanges]);
 
   // AI Generate state
   const [generateOpen, setGenerateOpen] = useState(false);
@@ -70,6 +106,18 @@ export function ContentEditor({
   const [targetLocale, setTargetLocale] = useState("");
   const [translating, setTranslating] = useState(false);
   const [translatedContent, setTranslatedContent] = useState("");
+
+  const handleValidateJson = useCallback(() => {
+    try {
+      JSON.parse(content);
+      setJsonError(null);
+      setJsonValid(true);
+      setTimeout(() => setJsonValid(false), 2000);
+    } catch (err) {
+      setJsonError((err as Error).message);
+      setJsonValid(false);
+    }
+  }, [content]);
 
   async function handleSave() {
     if (block.content_type === "json") {
@@ -211,9 +259,21 @@ export function ContentEditor({
   }
 
   const otherLocales = activeLanguages.filter((l) => l !== block.locale);
+  const pageGroup = getPageGroup(block.block_key);
 
   return (
     <>
+      {/* Breadcrumbs */}
+      <nav className="flex items-center gap-1 text-sm text-muted-foreground mb-2">
+        <Link href="/dashboard/content" className="text-primary hover:underline">
+          Content
+        </Link>
+        <ChevronRight className="h-3 w-3" />
+        <span>{pageGroup}</span>
+        <ChevronRight className="h-3 w-3" />
+        <span className="text-foreground">{humanizeKey(block.block_key)}</span>
+      </nav>
+
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-3xl font-semibold tracking-tight">
@@ -226,6 +286,9 @@ export function ContentEditor({
             <span className="text-sm text-muted-foreground">
               {block.locale.toUpperCase()}
             </span>
+            {hasChanges && (
+              <Badge variant="secondary" className="text-xs">Unsaved changes</Badge>
+            )}
           </div>
         </div>
         <div className="flex items-center gap-2">
@@ -287,12 +350,35 @@ export function ContentEditor({
                 />
               </div>
               {content && (
-                <div className="rounded-md border p-4">
+                <div className="relative rounded-md border p-4">
                   <img
                     src={content}
                     alt="Preview"
-                    className="max-h-[300px] rounded object-contain"
+                    className="max-h-[400px] max-w-full rounded object-contain"
                   />
+                  <div className="absolute bottom-2 right-2 flex gap-2">
+                    <Button
+                      variant="secondary"
+                      size="sm"
+                      className="gap-1"
+                      onClick={() => {
+                        const url = prompt("Enter new image URL:");
+                        if (url) setContent(url);
+                      }}
+                    >
+                      <Replace className="h-3 w-3" />
+                      Replace
+                    </Button>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      className="gap-1 text-destructive hover:text-destructive"
+                      onClick={() => setContent("")}
+                    >
+                      <Trash2 className="h-3 w-3" />
+                      Remove
+                    </Button>
+                  </div>
                 </div>
               )}
             </div>
@@ -304,25 +390,57 @@ export function ContentEditor({
 
           {block.content_type === "json" && block.block_key !== "resources_items" && (
             <div className="space-y-2">
-              <Label>JSON</Label>
+              <div className="flex items-center justify-between">
+                <Label>JSON</Label>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={handleValidateJson}
+                  className="gap-1"
+                >
+                  {jsonValid ? (
+                    <CheckCircle2 className="h-3 w-3 text-green-500" />
+                  ) : null}
+                  Validate JSON
+                </Button>
+              </div>
               <Textarea
                 value={content}
                 onChange={(e) => {
                   setContent(e.target.value);
                   setJsonError(null);
+                  setJsonValid(false);
                 }}
                 className="min-h-[300px] font-mono text-sm"
               />
               {jsonError && (
                 <p className="text-sm text-destructive">{jsonError}</p>
               )}
+              {jsonValid && (
+                <p className="text-sm text-green-600 flex items-center gap-1">
+                  <CheckCircle2 className="h-3 w-3" />
+                  Valid JSON
+                </p>
+              )}
             </div>
           )}
         </CardContent>
       </Card>
 
-      <div className="flex justify-end gap-3">
-        <Button variant="ghost" onClick={() => router.back()}>
+      {/* Sticky save footer */}
+      <div className="sticky bottom-0 z-10 -mx-6 border-t bg-background/95 backdrop-blur-sm px-6 py-3 flex items-center justify-end gap-3">
+        <Button
+          variant="ghost"
+          onClick={() => {
+            if (hasChanges) {
+              if (confirm("You have unsaved changes. Discard them?")) {
+                router.back();
+              }
+            } else {
+              router.back();
+            }
+          }}
+        >
           Discard Changes
         </Button>
         <Button onClick={handleSave} disabled={loading}>
@@ -331,9 +449,9 @@ export function ContentEditor({
         </Button>
       </div>
 
-      {/* AI Generate Dialog */}
+      {/* AI Generate Dialog — side-by-side comparison */}
       <Dialog open={generateOpen} onOpenChange={setGenerateOpen}>
-        <DialogContent className="max-w-2xl">
+        <DialogContent className="max-w-4xl">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
               <Sparkles className="h-5 w-5" />
@@ -368,12 +486,21 @@ export function ContentEditor({
               </div>
             )}
             {generatedContent && (
-              <div className="space-y-2">
-                <Label>Generated Content (preview)</Label>
-                <div
-                  className="prose prose-sm dark:prose-invert max-h-[300px] overflow-auto rounded-md border p-4"
-                  dangerouslySetInnerHTML={{ __html: generatedContent }}
-                />
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <Label className="text-muted-foreground">Current Content</Label>
+                  <div
+                    className="prose prose-sm dark:prose-invert max-h-[300px] overflow-auto rounded-md border bg-muted/30 p-4"
+                    dangerouslySetInnerHTML={{ __html: content }}
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label className="text-primary">AI Generated</Label>
+                  <div
+                    className="prose prose-sm dark:prose-invert max-h-[300px] overflow-auto rounded-md border border-primary/30 bg-primary/5 p-4"
+                    dangerouslySetInnerHTML={{ __html: generatedContent }}
+                  />
+                </div>
               </div>
             )}
           </div>
@@ -443,12 +570,21 @@ export function ContentEditor({
               </div>
             </div>
             {translatedContent && (
-              <div className="space-y-2">
-                <Label>Translated Content (preview)</Label>
-                <div
-                  className="prose prose-sm dark:prose-invert max-h-[300px] overflow-auto rounded-md border p-4"
-                  dangerouslySetInnerHTML={{ __html: translatedContent }}
-                />
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <Label className="text-muted-foreground">Original ({block.locale.toUpperCase()})</Label>
+                  <div
+                    className="prose prose-sm dark:prose-invert max-h-[300px] overflow-auto rounded-md border bg-muted/30 p-4"
+                    dangerouslySetInnerHTML={{ __html: content }}
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label className="text-primary">Translation ({targetLocale.toUpperCase()})</Label>
+                  <div
+                    className="prose prose-sm dark:prose-invert max-h-[300px] overflow-auto rounded-md border border-primary/30 bg-primary/5 p-4"
+                    dangerouslySetInnerHTML={{ __html: translatedContent }}
+                  />
+                </div>
               </div>
             )}
           </div>

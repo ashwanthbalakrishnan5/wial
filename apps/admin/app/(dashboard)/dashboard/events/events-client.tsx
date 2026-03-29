@@ -12,7 +12,6 @@ import {
   TableHeader,
   TableRow,
 } from "@repo/ui/table";
-import { Badge } from "@repo/ui/badge";
 import { Switch } from "@repo/ui/switch";
 import {
   Dialog,
@@ -41,6 +40,14 @@ import {
   MapPin,
   Video,
 } from "lucide-react";
+import { useTranslations, useLocale } from "next-intl";
+
+const typeBadgeClass: Record<string, string> = {
+  certification: "bg-teal-100 text-teal-700 dark:bg-teal-900/30 dark:text-teal-300",
+  workshop: "bg-yellow-100 text-yellow-700 dark:bg-yellow-900/30 dark:text-yellow-300",
+  meetup: "bg-sky-100 text-sky-700 dark:bg-sky-900/30 dark:text-sky-300",
+  webinar: "bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-300",
+};
 
 type Event = {
   id: string;
@@ -64,29 +71,6 @@ type Event = {
 
 const EVENT_TYPES = ["certification", "workshop", "meetup", "webinar"] as const;
 
-const typeColors: Record<string, "default" | "secondary" | "outline" | "destructive"> = {
-  certification: "default",
-  workshop: "secondary",
-  meetup: "outline",
-  webinar: "destructive",
-};
-
-function formatDate(dateStr: string): string {
-  return new Date(dateStr).toLocaleDateString("en-US", {
-    month: "short",
-    day: "numeric",
-    year: "numeric",
-  });
-}
-
-function formatDateRange(start: string, end: string | null): string {
-  if (!end) return formatDate(start);
-  const s = new Date(start);
-  const e = new Date(end);
-  if (s.toDateString() === e.toDateString()) return formatDate(start);
-  return `${formatDate(start)} – ${formatDate(end)}`;
-}
-
 export function EventsClient({
   events,
   chapterId,
@@ -101,12 +85,31 @@ export function EventsClient({
   isGlobalView: boolean;
 }) {
   const router = useRouter();
+  const t = useTranslations("events");
+  const tc = useTranslations("common");
+  const locale = useLocale();
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editing, setEditing] = useState<Event | null>(null);
   const [loading, setLoading] = useState(false);
   const [filterType, setFilterType] = useState<string>("all");
   const [filterDate, setFilterDate] = useState<string>("upcoming");
   const [filterPublished, setFilterPublished] = useState<string>("all");
+
+  function formatDate(dateStr: string): string {
+    return new Date(dateStr).toLocaleDateString(locale, {
+      month: "short",
+      day: "numeric",
+      year: "numeric",
+    });
+  }
+
+  function formatDateRange(start: string, end: string | null): string {
+    if (!end) return formatDate(start);
+    const s = new Date(start);
+    const e = new Date(end);
+    if (s.toDateString() === e.toDateString()) return formatDate(start);
+    return `${formatDate(start)} – ${formatDate(end)}`;
+  }
 
   // Form state
   const [title, setTitle] = useState("");
@@ -229,18 +232,18 @@ export function EventsClient({
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-3xl font-semibold tracking-tight">
-            {isGlobalView ? "Global Events" : "Events"}
+            {isGlobalView ? t("viewAllEvents") : t("title")}
           </h1>
           <p className="text-muted-foreground">
             {isGlobalView
-              ? "View events across all chapters."
-              : "Manage events for your chapter."}
+              ? t("viewAllEvents")
+              : t("manageEvents")}
           </p>
         </div>
         {canManage && chapterId && (
           <Button onClick={openCreate}>
             <Plus className="mr-2 h-4 w-4" />
-            Create Event
+            {t("createEvent")}
           </Button>
         )}
       </div>
@@ -249,13 +252,13 @@ export function EventsClient({
       <div className="flex items-center gap-3">
         <Select value={filterType} onValueChange={setFilterType}>
           <SelectTrigger className="w-[160px]">
-            <SelectValue placeholder="All types" />
+            <SelectValue placeholder={tc("allTypes")} />
           </SelectTrigger>
           <SelectContent>
-            <SelectItem value="all">All Types</SelectItem>
-            {EVENT_TYPES.map((t) => (
-              <SelectItem key={t} value={t}>
-                {t.charAt(0).toUpperCase() + t.slice(1)}
+            <SelectItem value="all">{tc("allTypes")}</SelectItem>
+            {EVENT_TYPES.map((type) => (
+              <SelectItem key={type} value={type}>
+                {t(type)}
               </SelectItem>
             ))}
           </SelectContent>
@@ -265,9 +268,9 @@ export function EventsClient({
             <SelectValue />
           </SelectTrigger>
           <SelectContent>
-            <SelectItem value="upcoming">Upcoming</SelectItem>
-            <SelectItem value="past">Past</SelectItem>
-            <SelectItem value="all">All Dates</SelectItem>
+            <SelectItem value="upcoming">{tc("upcoming")}</SelectItem>
+            <SelectItem value="past">{tc("past")}</SelectItem>
+            <SelectItem value="all">{tc("allDates")}</SelectItem>
           </SelectContent>
         </Select>
         <Select value={filterPublished} onValueChange={setFilterPublished}>
@@ -275,9 +278,9 @@ export function EventsClient({
             <SelectValue />
           </SelectTrigger>
           <SelectContent>
-            <SelectItem value="all">All Status</SelectItem>
-            <SelectItem value="published">Published</SelectItem>
-            <SelectItem value="draft">Draft</SelectItem>
+            <SelectItem value="all">{tc("allStatus")}</SelectItem>
+            <SelectItem value="published">{tc("published")}</SelectItem>
+            <SelectItem value="draft">{tc("draft")}</SelectItem>
           </SelectContent>
         </Select>
       </div>
@@ -285,14 +288,14 @@ export function EventsClient({
       {filtered.length === 0 ? (
         <div className="flex flex-col items-center justify-center rounded-lg border border-dashed p-12 text-center">
           <Calendar className="h-12 w-12 text-muted-foreground" />
-          <h3 className="mt-4 text-lg font-semibold">No events yet</h3>
+          <h3 className="mt-4 text-lg font-semibold">{t("noEvents")}</h3>
           <p className="mt-1 text-sm text-muted-foreground">
-            Create your first event to share with your community.
+            {t("noEventsDesc")}
           </p>
           {canManage && chapterId && (
             <Button onClick={openCreate} className="mt-4">
               <Plus className="mr-2 h-4 w-4" />
-              Create Event
+              {t("createEvent")}
             </Button>
           )}
         </div>
@@ -301,12 +304,13 @@ export function EventsClient({
           <Table>
             <TableHeader>
               <TableRow>
-                <TableHead>Title</TableHead>
-                <TableHead>Type</TableHead>
-                <TableHead>Date</TableHead>
-                <TableHead>Location</TableHead>
-                <TableHead>Published</TableHead>
-                {isGlobalView && <TableHead>Chapter</TableHead>}
+                <TableHead>{t("eventTitle")}</TableHead>
+                <TableHead>{t("eventType")}</TableHead>
+                <TableHead>{tc("date") || "Date"}</TableHead>
+                <TableHead>{t("location")}</TableHead>
+                <TableHead>Registrations</TableHead>
+                <TableHead>{tc("published")}</TableHead>
+                {isGlobalView && <TableHead>{tc("chapter") || "Chapter"}</TableHead>}
                 <TableHead className="w-24" />
               </TableRow>
             </TableHeader>
@@ -315,9 +319,9 @@ export function EventsClient({
                 <TableRow key={evt.id}>
                   <TableCell className="font-medium">{evt.title}</TableCell>
                   <TableCell>
-                    <Badge variant={typeColors[evt.event_type] ?? "outline"}>
-                      {evt.event_type}
-                    </Badge>
+                    <span className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium ${typeBadgeClass[evt.event_type] ?? "bg-muted text-muted-foreground"}`}>
+                      {t(evt.event_type)}
+                    </span>
                   </TableCell>
                   <TableCell className="text-muted-foreground">
                     {formatDateRange(evt.start_date, evt.end_date)}
@@ -326,7 +330,7 @@ export function EventsClient({
                     {evt.is_virtual ? (
                       <span className="inline-flex items-center gap-1 text-sm text-muted-foreground">
                         <Video className="h-3.5 w-3.5" />
-                        Virtual
+                        {t("virtual")}
                       </span>
                     ) : evt.location ? (
                       <span className="inline-flex items-center gap-1 text-sm text-muted-foreground">
@@ -335,6 +339,13 @@ export function EventsClient({
                       </span>
                     ) : (
                       <span className="text-muted-foreground">—</span>
+                    )}
+                  </TableCell>
+                  <TableCell className="text-sm text-muted-foreground">
+                    {evt.registration_link ? (
+                      <span>{evt.max_attendees ? `0 / ${evt.max_attendees}` : "Open"}</span>
+                    ) : (
+                      <span>—</span>
                     )}
                   </TableCell>
                   <TableCell>
@@ -381,12 +392,12 @@ export function EventsClient({
         <DialogContent className="max-w-lg max-h-[90vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle>
-              {editing ? "Edit Event" : "Create Event"}
+              {editing ? t("editEvent") : t("createEvent")}
             </DialogTitle>
           </DialogHeader>
           <div className="space-y-4">
             <div className="space-y-2">
-              <Label>Title *</Label>
+              <Label>{t("eventTitle")} *</Label>
               <Input
                 value={title}
                 onChange={(e) => setTitle(e.target.value)}
@@ -394,7 +405,7 @@ export function EventsClient({
               />
             </div>
             <div className="space-y-2">
-              <Label>Description</Label>
+              <Label>{t("description")}</Label>
               <Textarea
                 value={description}
                 onChange={(e) => setDescription(e.target.value)}
@@ -403,33 +414,33 @@ export function EventsClient({
             </div>
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-2">
-                <Label>Event Type *</Label>
+                <Label>{t("eventType")} *</Label>
                 <Select value={eventType} onValueChange={setEventType}>
                   <SelectTrigger>
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
-                    {EVENT_TYPES.map((t) => (
-                      <SelectItem key={t} value={t}>
-                        {t.charAt(0).toUpperCase() + t.slice(1)}
+                    {EVENT_TYPES.map((type) => (
+                      <SelectItem key={type} value={type}>
+                        {t(type)}
                       </SelectItem>
                     ))}
                   </SelectContent>
                 </Select>
               </div>
               <div className="space-y-2">
-                <Label>Max Attendees</Label>
+                <Label>{t("maxAttendees")}</Label>
                 <Input
                   type="number"
                   value={maxAttendees}
                   onChange={(e) => setMaxAttendees(e.target.value)}
-                  placeholder="Unlimited"
+                  placeholder={t("unlimited")}
                 />
               </div>
             </div>
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-2">
-                <Label>Start Date *</Label>
+                <Label>{t("startDate")} *</Label>
                 <Input
                   type="datetime-local"
                   value={startDate}
@@ -438,7 +449,7 @@ export function EventsClient({
                 />
               </div>
               <div className="space-y-2">
-                <Label>End Date</Label>
+                <Label>{t("endDate")}</Label>
                 <Input
                   type="datetime-local"
                   value={endDate}
@@ -451,11 +462,11 @@ export function EventsClient({
                 checked={isVirtual}
                 onCheckedChange={setIsVirtual}
               />
-              <Label>Virtual Event</Label>
+              <Label>{t("virtualEvent")}</Label>
             </div>
             {isVirtual ? (
               <div className="space-y-2">
-                <Label>Virtual Link</Label>
+                <Label>{t("virtualLink")}</Label>
                 <Input
                   value={virtualLink}
                   onChange={(e) => setVirtualLink(e.target.value)}
@@ -464,7 +475,7 @@ export function EventsClient({
               </div>
             ) : (
               <div className="space-y-2">
-                <Label>Location</Label>
+                <Label>{t("location")}</Label>
                 <Input
                   value={location}
                   onChange={(e) => setLocation(e.target.value)}
@@ -473,7 +484,7 @@ export function EventsClient({
               </div>
             )}
             <div className="space-y-2">
-              <Label>Registration Link</Label>
+              <Label>{t("registrationLink")}</Label>
               <Input
                 value={registrationLink}
                 onChange={(e) => setRegistrationLink(e.target.value)}
@@ -485,19 +496,19 @@ export function EventsClient({
                 checked={isPublished}
                 onCheckedChange={setIsPublished}
               />
-              <Label>Publish to website</Label>
+              <Label>{t("publishToWebsite")}</Label>
             </div>
           </div>
           <DialogFooter>
             <Button variant="ghost" onClick={() => setDialogOpen(false)}>
-              Cancel
+              {tc("cancel")}
             </Button>
             <Button
               onClick={handleSave}
               disabled={loading || !title || !startDate}
             >
               {loading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-              {editing ? "Save Changes" : "Create Event"}
+              {editing ? tc("saveChanges") : t("createEvent")}
             </Button>
           </DialogFooter>
         </DialogContent>

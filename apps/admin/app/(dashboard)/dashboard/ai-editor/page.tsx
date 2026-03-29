@@ -3,22 +3,17 @@ import { createClient } from "@repo/supabase/server";
 import { redirect } from "next/navigation";
 import { AiEditorClient } from "./ai-editor-client";
 
-export default async function AiEditorPage({
-  searchParams,
-}: {
-  searchParams: Promise<{ chapter?: string }>;
-}) {
+export default async function AiEditorPage() {
   const user = await getAuthUser();
   if (!user) redirect("/login");
 
-  const { chapter: chapterId } = await searchParams;
   const supabase = await createClient();
 
-  let resolvedChapterId = chapterId;
-  if (!resolvedChapterId && !isSuperAdmin(user.roles)) {
-    const firstChapterRole = user.roles.find((r) => r.chapter_id);
-    resolvedChapterId = firstChapterRole?.chapter_id ?? undefined;
-  }
+  // Auto-resolve chapter from user roles
+  const isAdmin = isSuperAdmin(user.roles);
+  const resolvedChapterId = !isAdmin
+    ? user.roles.find((r) => r.chapter_id)?.chapter_id ?? undefined
+    : undefined;
 
   if (!resolvedChapterId) {
     return (

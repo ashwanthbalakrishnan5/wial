@@ -1,8 +1,8 @@
 ---
-import BaseLayout from "../../layouts/BaseLayout.astro";
-import AccordionItem from "../../components/AccordionItem.astro";
-import { getChapterData } from "../../lib/data";
-import { getBlock, getJsonBlock } from "../../lib/content";
+import BaseLayout from "@repo/template-core/layouts/BaseLayout.astro";
+import AccordionItem from "@repo/template-core/components/AccordionItem.astro";
+import { getChapterData } from "@repo/template-core/lib/data";
+import { getBlock, getJsonBlock } from "@repo/template-core/lib/content";
 
 export async function getStaticPaths() {
   const slug = import.meta.env.CHAPTER_SLUG;
@@ -35,6 +35,8 @@ interface ALComponent {
 }
 const alComponents = getJsonBlock<ALComponent[]>(contentBlocks, "al_components") ?? [];
 
+const hasMainContent = !!(intro || solvesTitle || spheresTitle || alComponents.length > 0 || benefitsTitle);
+
 // Certification section data
 interface CertLevel {
   level: string;
@@ -63,64 +65,75 @@ const certOrder = ["CALC", "SALC", "MALC", "PALC"];
       <h1 class="text-4xl md:text-5xl font-bold font-heading" style="color:var(--color-brand-primary)">
         {title}
       </h1>
+      {/* Show CTA in hero when there's no body content */}
+      {!hasMainContent && ctaText && ctaLink && (
+        <a
+          href={ctaLink}
+          class="inline-block mt-8 px-8 py-3.5 text-base font-semibold rounded-full bg-brand-accent text-warm-charcoal hover:opacity-90 transition-opacity shadow-md"
+        >
+          {ctaText}
+        </a>
+      )}
     </div>
   </section>
 
-  <section class="py-12 md:py-16">
-    <div class="mx-auto max-w-[1200px] px-4 sm:px-6">
-      <div class="max-w-[42rem] mx-auto">
-        {intro && (
-          <div class="prose mb-10" set:html={intro} />
-        )}
+  {hasMainContent && (
+    <section class="py-12 md:py-16">
+      <div class="mx-auto max-w-[1200px] px-4 sm:px-6">
+        <div class="max-w-[42rem] mx-auto">
+          {intro && (
+            <div class="prose mb-10" set:html={intro} />
+          )}
 
-        {solvesTitle && (
-          <div class="mb-10">
-            <h2 class="text-2xl font-bold font-heading mb-4">{solvesTitle}</h2>
-            {solvesBody && <div class="prose" set:html={solvesBody} />}
-          </div>
-        )}
-
-        {spheresTitle && (
-          <div class="mb-10">
-            <h2 class="text-2xl font-bold font-heading mb-4">{spheresTitle}</h2>
-            {spheresBody && <div class="prose" set:html={spheresBody} />}
-          </div>
-        )}
-
-        {alComponents.length > 0 && (
-          <div class="mb-10">
-            <h2 class="text-2xl font-bold font-heading mb-3">{componentsTitle}</h2>
-            {componentsIntro && (
-              <div class="prose mb-6" set:html={componentsIntro} />
-            )}
-            <div class="space-y-0">
-              {alComponents.map((comp) => (
-                <AccordionItem title={comp.title} content={comp.description} />
-              ))}
+          {solvesTitle && (
+            <div class="mb-10">
+              <h2 class="text-2xl font-bold font-heading mb-4">{solvesTitle}</h2>
+              {solvesBody && <div class="prose" set:html={solvesBody} />}
             </div>
-          </div>
-        )}
+          )}
 
-        {benefitsTitle && (
-          <div class="mb-10">
-            <h2 class="text-2xl font-bold font-heading mb-4">{benefitsTitle}</h2>
-            {benefitsBody && <div class="prose" set:html={benefitsBody} />}
-          </div>
-        )}
+          {spheresTitle && (
+            <div class="mb-10">
+              <h2 class="text-2xl font-bold font-heading mb-4">{spheresTitle}</h2>
+              {spheresBody && <div class="prose" set:html={spheresBody} />}
+            </div>
+          )}
 
-        {ctaText && ctaLink && (
-          <div class="text-center mt-12">
-            <a
-              href={ctaLink}
-              class="inline-block px-8 py-3.5 text-base font-semibold rounded-full bg-brand-accent text-warm-charcoal hover:opacity-90 transition-opacity shadow-md"
-            >
-              {ctaText}
-            </a>
-          </div>
-        )}
+          {alComponents.length > 0 && (
+            <div class="mb-10">
+              <h2 class="text-2xl font-bold font-heading mb-3">{componentsTitle}</h2>
+              {componentsIntro && (
+                <div class="prose mb-6" set:html={componentsIntro} />
+              )}
+              <div class="space-y-0">
+                {alComponents.map((comp) => (
+                  <AccordionItem title={comp.title} content={comp.description} />
+                ))}
+              </div>
+            </div>
+          )}
+
+          {benefitsTitle && (
+            <div class="mb-10">
+              <h2 class="text-2xl font-bold font-heading mb-4">{benefitsTitle}</h2>
+              {benefitsBody && <div class="prose" set:html={benefitsBody} />}
+            </div>
+          )}
+
+          {ctaText && ctaLink && (
+            <div class="text-center mt-12">
+              <a
+                href={ctaLink}
+                class="inline-block px-8 py-3.5 text-base font-semibold rounded-full bg-brand-accent text-warm-charcoal hover:opacity-90 transition-opacity shadow-md"
+              >
+                {ctaText}
+              </a>
+            </div>
+          )}
+        </div>
       </div>
-    </div>
-  </section>
+    </section>
+  )}
 
   {/* Certification Levels Section */}
   {certLevels.length > 0 && (
