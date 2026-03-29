@@ -1,0 +1,164 @@
+---
+import BaseLayout from "@repo/template-core/layouts/BaseLayout.astro";
+import CertBadge from "@repo/template-core/components/CertBadge.astro";
+import { getChapterData } from "@repo/template-core/lib/data";
+import { generateCoachSlug, getInitials, getCertColor, getCertLabel } from "@repo/template-core/lib/utils";
+import type { Tables } from "@repo/types";
+
+export async function getStaticPaths() {
+  const chapterSlug = import.meta.env.CHAPTER_SLUG;
+  const { chapter, coaches } = await getChapterData(chapterSlug);
+  const paths: { params: { locale: string; slug: string }; props: { coach: Tables<"coaches"> } }[] = [];
+  for (const lang of chapter.active_languages) {
+    for (const coach of coaches) {
+      paths.push({
+        params: { locale: lang, slug: generateCoachSlug(coach.id, coach.full_name) },
+        props: { coach },
+      });
+    }
+  }
+  return paths;
+}
+
+interface Props {
+  coach: Tables<"coaches">;
+}
+
+const { locale } = Astro.params;
+const { coach } = Astro.props;
+const initials = getInitials(coach.full_name);
+const { text: certText } = getCertColor(coach.certification_level);
+const certLabel = getCertLabel(coach.certification_level);
+const location = [coach.city, coach.country].filter(Boolean).join(", ");
+
+const certOrder = ["CALC", "SALC", "MALC", "PALC"];
+const certIndex = certOrder.indexOf(coach.certification_level) + 1;
+---
+
+<BaseLayout title={coach.full_name} locale={locale}>
+  {/* Back link */}
+  <div class="mx-auto max-w-[1200px] px-4 sm:px-6 pt-6">
+    <a href={`/${locale}/coaches`} class="inline-flex items-center gap-1.5 text-sm text-text-secondary hover:text-brand-primary transition-colors">
+      <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m12 19-7-7 7-7"/><path d="M19 12H5"/></svg>
+      Back to Coach Directory
+    </a>
+  </div>
+
+  {/* Profile Header */}
+  <section class="mt-4 py-10 md:py-14" style={`background-color: ${getCertColor(coach.certification_level).bg}`}>
+    <div class="mx-auto max-w-[1200px] px-4 sm:px-6">
+      <div class="flex flex-col md:flex-row items-center md:items-start gap-8">
+        {coach.photo_url ? (
+          <img
+            src={coach.photo_url}
+            alt={coach.full_name}
+            class="w-40 h-40 rounded-full object-cover border-4 border-white shadow-lg"
+          />
+        ) : (
+          <div
+            class="w-40 h-40 rounded-full border-4 border-white shadow-lg flex items-center justify-center text-4xl font-bold text-white font-heading"
+            style={`background-color:${certText}`}
+          >
+            {initials}
+          </div>
+        )}
+
+        <div class="text-center md:text-left">
+          <h1 class="text-3xl md:text-4xl font-bold font-heading mb-2">
+            {coach.full_name}
+          </h1>
+          <p class="text-text-secondary mb-3">{certLabel}</p>
+          <CertBadge level={coach.certification_level} size="md" />
+          {location && (
+            <p class="text-sm text-text-secondary mt-3 flex items-center justify-center md:justify-start gap-1.5">
+              <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 10c0 6-8 12-8 12s-8-6-8-12a8 8 0 0 1 16 0Z"/><circle cx="12" cy="10" r="3"/></svg>
+              {location}
+            </p>
+          )}
+
+          <div class="flex items-center justify-center md:justify-start gap-3 mt-4">
+            {coach.contact_email && (
+              <a href={`mailto:${coach.contact_email}`} class="w-9 h-9 rounded-lg bg-white/80 flex items-center justify-center text-brand-primary hover:bg-white transition-colors" aria-label="Email">
+                <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="20" height="16" x="2" y="4" rx="2"/><path d="m22 7-8.97 5.7a1.94 1.94 0 0 1-2.06 0L2 7"/></svg>
+              </a>
+            )}
+            {coach.contact_phone && (
+              <a href={`tel:${coach.contact_phone}`} class="w-9 h-9 rounded-lg bg-white/80 flex items-center justify-center text-brand-primary hover:bg-white transition-colors" aria-label="Phone">
+                <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92z"/></svg>
+              </a>
+            )}
+            {coach.website && (
+              <a href={coach.website} target="_blank" rel="noopener noreferrer" class="w-9 h-9 rounded-lg bg-white/80 flex items-center justify-center text-brand-primary hover:bg-white transition-colors" aria-label="Website">
+                <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="M12 2a14.5 14.5 0 0 0 0 20 14.5 14.5 0 0 0 0-20"/><path d="M2 12h20"/></svg>
+              </a>
+            )}
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  {/* Bio + Sidebar */}
+  <section class="py-12 md:py-16">
+    <div class="mx-auto max-w-[1200px] px-4 sm:px-6">
+      <div class="flex flex-col md:flex-row gap-10 md:gap-16">
+        <div class="flex-1">
+          {coach.bio ? (
+            <div class="prose" set:html={coach.bio} />
+          ) : (
+            <p class="text-text-secondary italic">No bio provided yet.</p>
+          )}
+        </div>
+
+        <aside class="w-full md:w-80 md:flex-shrink-0">
+          <div class="md:sticky md:top-24 space-y-6">
+            {coach.specializations.length > 0 && (
+              <div>
+                <h3 class="text-xs uppercase tracking-widest text-text-muted mb-3 font-heading font-semibold">Specializations</h3>
+                <div class="flex flex-wrap gap-2">
+                  {coach.specializations.map((tag) => (
+                    <span class="px-2.5 py-1 text-sm rounded-md bg-surface-muted text-text-secondary">{tag}</span>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {coach.languages.length > 0 && (
+              <div>
+                <h3 class="text-xs uppercase tracking-widest text-text-muted mb-3 font-heading font-semibold">Languages</h3>
+                <div class="flex flex-wrap gap-2">
+                  {coach.languages.map((lang) => (
+                    <span class="px-2.5 py-1 text-sm rounded-md bg-surface-muted text-text-secondary">{lang}</span>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            <div>
+              <h3 class="text-xs uppercase tracking-widest text-text-muted mb-3 font-heading font-semibold">Hours Logged</h3>
+              <p class="text-2xl font-bold font-heading text-brand-primary flex items-center gap-2">
+                <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+                {coach.hours_logged.toLocaleString()}
+              </p>
+            </div>
+
+            <div>
+              <h3 class="text-xs uppercase tracking-widest text-text-muted mb-3 font-heading font-semibold">Certification</h3>
+              <div class="flex gap-2">
+                {certOrder.map((level, i) => (
+                  <div class="flex-1">
+                    <div
+                      class="h-2 rounded-full"
+                      style={`background-color: ${i < certIndex ? getCertColor(coach.certification_level).text : '#e5e0da'}`}
+                    ></div>
+                    <p class="text-[10px] text-text-muted mt-1 text-center">{level}</p>
+                  </div>
+                ))}
+              </div>
+            </div>
+          </div>
+        </aside>
+      </div>
+    </div>
+  </section>
+</BaseLayout>

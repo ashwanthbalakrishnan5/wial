@@ -1,0 +1,346 @@
+---
+import BaseLayout from "@repo/template-core/layouts/BaseLayout.astro";
+import CoachCard from "@repo/template-core/components/CoachCard.astro";
+import { getChapterData } from "@repo/template-core/lib/data";
+import { getBlock } from "@repo/template-core/lib/content";
+
+export async function getStaticPaths() {
+  const slug = import.meta.env.CHAPTER_SLUG;
+  const { chapter } = await getChapterData(slug);
+  return chapter.active_languages.map((lang: string) => ({
+    params: { locale: lang },
+  }));
+}
+
+const { locale } = Astro.params;
+const slug = import.meta.env.CHAPTER_SLUG;
+const supabaseUrl = import.meta.env.PUBLIC_SUPABASE_URL;
+const { chapter, contentBlocks, coaches } = await getChapterData(slug, locale);
+
+const title = getBlock(contentBlocks, "coaches_title", "Our Coaches");
+const description = getBlock(contentBlocks, "coaches_description", "");
+const aiMatchingEnabled = getBlock(contentBlocks, "ai_coach_matching_enabled", "false") === "true";
+
+const certLevels = [...new Set(coaches.map((c) => c.certification_level))].sort();
+const languages = [...new Set(coaches.flatMap((c) => c.languages))].sort();
+---
+
+<BaseLayout title="Coaches" locale={locale}>
+  {/* Page Hero */}
+  <section class="relative overflow-hidden py-16 md:py-24">
+    <div class="absolute inset-0" style="background: linear-gradient(135deg, var(--color-brand-primary-light) 0%, var(--color-warm-ivory) 60%, var(--color-brand-accent-light) 100%)"></div>
+    <div class="relative z-10 mx-auto max-w-[1200px] px-4 sm:px-6">
+      <div class="max-w-3xl">
+        <p class="overline text-brand-accent mb-3">Our Team</p>
+        <h1 class="text-4xl md:text-5xl lg:text-[3.5rem] font-bold font-heading tracking-tight" style="color:var(--color-brand-primary)">
+          {title}
+        </h1>
+        {description && (
+          <p class="text-lg text-text-secondary mt-4 max-w-xl">{description}</p>
+        )}
+      </div>
+    </div>
+    <div class="absolute bottom-0 left-0 right-0">
+      <svg viewBox="0 0 1440 48" preserveAspectRatio="none" class="w-full h-8 md:h-12" fill="var(--color-warm-ivory)">
+        <path d="M0,24 C360,48 1080,0 1440,28 L1440,48 L0,48 Z"/>
+      </svg>
+    </div>
+  </section>
+
+  {/* Find Your Coach — AI Matching Widget */}
+  {aiMatchingEnabled && coaches.length > 0 && (
+    <section class="py-8 md:py-10">
+      <div class="mx-auto max-w-[1200px] px-4 sm:px-6">
+        <div class="rounded-xl border border-border bg-gradient-to-r from-brand-primary-light to-brand-accent-light p-6 md:p-8">
+          <h2 class="text-2xl md:text-3xl font-bold font-heading" style="color:var(--color-brand-primary)">
+            Find Your Coach
+          </h2>
+          <p class="text-text-secondary mt-2 mb-5">
+            Describe what you're looking for and we'll match you with the right coach.
+          </p>
+          <div class="flex flex-col sm:flex-row gap-3">
+            <input
+              type="text"
+              id="ai-match-input"
+              placeholder="e.g., Leadership development for a manufacturing team in Brazil..."
+              class="flex-1 px-4 py-3 text-base rounded-lg border border-border bg-surface text-text-primary placeholder-text-muted focus:outline-none focus:border-brand-primary focus:ring-2 focus:ring-brand-primary/20"
+              aria-label="Describe what kind of coach you are looking for"
+            />
+            <button
+              type="button"
+              id="ai-match-btn"
+              class="inline-flex items-center justify-center gap-2 px-6 py-3 rounded-lg font-medium text-white transition-colors"
+              style="background-color:var(--color-brand-primary)"
+            >
+              <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m12 3-1.912 5.813a2 2 0 0 1-1.275 1.275L3 12l5.813 1.912a2 2 0 0 1 1.275 1.275L12 21l1.912-5.813a2 2 0 0 1 1.275-1.275L21 12l-5.813-1.912a2 2 0 0 1-1.275-1.275L12 3Z"/><path d="M5 3v4"/><path d="M19 17v4"/><path d="M3 5h4"/><path d="M17 19h4"/></svg>
+              Match Me
+            </button>
+          </div>
+
+          {/* Results area */}
+          <div id="ai-match-results" class="mt-6 hidden">
+            {/* Loading skeleton */}
+            <div id="ai-match-loading" class="hidden space-y-4">
+              <div class="h-32 rounded-lg bg-surface-muted animate-pulse"></div>
+              <div class="h-32 rounded-lg bg-surface-muted animate-pulse"></div>
+              <div class="h-32 rounded-lg bg-surface-muted animate-pulse"></div>
+            </div>
+            {/* Matched coaches */}
+            <div id="ai-match-list" class="space-y-4"></div>
+            {/* Error */}
+            <p id="ai-match-error" class="hidden text-sm text-destructive"></p>
+          </div>
+        </div>
+      </div>
+
+      <script define:vars={{ supabaseUrl, chapterId: chapter.id, locale }}>
+        const matchInput = document.getElementById("ai-match-input");
+        const matchBtn = document.getElementById("ai-match-btn");
+        const matchResults = document.getElementById("ai-match-results");
+        const matchLoading = document.getElementById("ai-match-loading");
+        const matchList = document.getElementById("ai-match-list");
+        const matchError = document.getElementById("ai-match-error");
+
+        async function doMatch() {
+          const query = matchInput?.value?.trim();
+          if (!query || !supabaseUrl) return;
+
+          // Show results area with loading
+          matchResults.classList.remove("hidden");
+          matchLoading.classList.remove("hidden");
+          matchList.innerHTML = "";
+          matchError.classList.add("hidden");
+          matchBtn.disabled = true;
+          matchInput.disabled = true;
+
+          try {
+            const res = await fetch(supabaseUrl + "/functions/v1/find-coach-match", {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({ query, chapter_id: chapterId }),
+            });
+
+            if (!res.ok) {
+              throw new Error("Search failed");
+            }
+
+            const data = await res.json();
+            const matches = data.matches || [];
+
+            matchLoading.classList.add("hidden");
+
+            if (matches.length === 0) {
+              matchList.innerHTML = '<p class="text-text-secondary text-sm py-4">No coaches matched your query. Try different words.</p>';
+              return;
+            }
+
+            const prefix = locale ? "/" + locale : "";
+
+            matchList.innerHTML = matches.map((m) => {
+              const c = m.coach;
+              const initials = c.full_name.split(" ").map((n) => n[0]).join("").slice(0, 2).toUpperCase();
+              const certColors = { CALC: "#3B82F6", SALC: "#22C55E", MALC: "#F59E0B", PALC: "#7C3AED" };
+              const certColor = certColors[c.certification_level] || "#6B7280";
+              const specs = (c.specializations || []).slice(0, 3).map((s) => '<span class="px-2 py-0.5 text-xs rounded-md bg-surface-muted text-text-secondary">' + s + '</span>').join("");
+              const location = [c.city, c.country].filter(Boolean).join(", ");
+              const photo = c.photo_url
+                ? '<img src="' + c.photo_url + '" alt="' + c.full_name + '" class="w-14 h-14 rounded-full object-cover border-2 border-surface" />'
+                : '<div class="w-14 h-14 rounded-full flex items-center justify-center text-sm font-bold text-white" style="background-color:' + certColor + '">' + initials + '</div>';
+
+              const reason = m.reason
+                ? '<p class="text-sm text-text-secondary italic mt-2">' + m.reason + '</p>'
+                : '';
+
+              return '<div class="flex gap-4 p-4 rounded-lg border border-border bg-surface">' +
+                '<div class="shrink-0">' + photo + '</div>' +
+                '<div class="flex-1 min-w-0">' +
+                  '<div class="flex items-center gap-2 mb-1">' +
+                    '<h4 class="font-semibold font-heading text-base">' + c.full_name + '</h4>' +
+                    '<span class="px-2 py-0.5 text-xs font-medium rounded-full border-l-2" style="color:' + certColor + ';border-color:' + certColor + ';background:' + certColor + '15">' + c.certification_level + '</span>' +
+                  '</div>' +
+                  (location ? '<p class="text-xs text-text-muted mb-1">' + location + '</p>' : '') +
+                  (specs ? '<div class="flex flex-wrap gap-1 mb-1">' + specs + '</div>' : '') +
+                  reason +
+                  '<a href="' + prefix + '/coaches/' + c.id + '-' + c.full_name.toLowerCase().replace(/[^a-z0-9]+/g, '-') + '" class="inline-flex items-center gap-1 text-sm font-medium mt-2" style="color:var(--color-brand-primary)">View Profile &rarr;</a>' +
+                '</div>' +
+              '</div>';
+            }).join("");
+          } catch (err) {
+            matchLoading.classList.add("hidden");
+            matchError.textContent = "Something went wrong. Please try again.";
+            matchError.classList.remove("hidden");
+          } finally {
+            matchBtn.disabled = false;
+            matchInput.disabled = false;
+          }
+        }
+
+        matchBtn?.addEventListener("click", doMatch);
+        matchInput?.addEventListener("keydown", (e) => {
+          if (e.key === "Enter") doMatch();
+        });
+      </script>
+    </section>
+  )}
+
+  <section class="py-12 md:py-16">
+    <div class="mx-auto max-w-[1200px] px-4 sm:px-6">
+      {coaches.length > 0 ? (
+        <>
+          {/* Filters */}
+          <div class="flex flex-col sm:flex-row items-stretch sm:items-center gap-3 mb-10 sticky top-16 z-10 bg-warm-ivory py-3 -mt-3">
+            <div class="flex-1">
+              <input
+                type="text"
+                id="coach-search"
+                placeholder="Search coaches..."
+                class="w-full px-4 py-2.5 rounded-lg border border-border bg-surface text-text-primary placeholder-text-muted focus:outline-none focus:border-brand-primary focus:ring-2 focus:ring-brand-primary/20"
+                aria-label="Search coaches by name"
+              />
+            </div>
+            {certLevels.length > 1 && (
+              <select
+                id="cert-filter"
+                class="px-4 py-2.5 rounded-lg border border-border bg-surface text-text-primary focus:outline-none focus:border-brand-primary"
+                aria-label="Filter by certification level"
+              >
+                <option value="">All Certifications</option>
+                {certLevels.map((level) => (
+                  <option value={level}>{level}</option>
+                ))}
+              </select>
+            )}
+            {languages.length > 1 && (
+              <select
+                id="lang-filter"
+                class="px-4 py-2.5 rounded-lg border border-border bg-surface text-text-primary focus:outline-none focus:border-brand-primary"
+                aria-label="Filter by language"
+              >
+                <option value="">All Languages</option>
+                {languages.map((lang) => (
+                  <option value={lang.toLowerCase()}>{lang}</option>
+                ))}
+              </select>
+            )}
+          </div>
+
+          {/* Coach Grid */}
+          <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6 lg:gap-8" id="coach-grid">
+            {coaches.map((coach) => (
+              <CoachCard coach={coach} locale={locale} />
+            ))}
+          </div>
+
+          <p id="no-results" class="hidden text-center py-10 text-text-secondary">
+            No coaches matched your search. Try different words or clear the search to see everyone.
+          </p>
+
+          <script define:vars={{ supabaseUrl, chapterId: chapter.id, locale }}>
+            const search = document.getElementById("coach-search");
+            const certFilter = document.getElementById("cert-filter");
+            const langFilter = document.getElementById("lang-filter");
+            const cards = document.querySelectorAll("[data-coach-card]");
+            const grid = document.getElementById("coach-grid");
+            const noResults = document.getElementById("no-results");
+            let debounceTimer = null;
+            let isSemanticMode = false;
+
+            // Client-side filtering for quick local filter
+            function filterCards() {
+              if (isSemanticMode) return;
+              const q = (search?.value || "").toLowerCase();
+              const cert = certFilter?.value || "";
+              const lang = langFilter?.value || "";
+              let visible = 0;
+              cards.forEach((card) => {
+                const name = card.dataset.name || "";
+                const cardCert = card.dataset.cert || "";
+                const cardLangs = card.dataset.languages || "";
+                const show =
+                  (!q || name.includes(q)) &&
+                  (!cert || cardCert === cert) &&
+                  (!lang || cardLangs.includes(lang));
+                card.style.display = show ? "" : "none";
+                if (show) visible++;
+              });
+              if (noResults) noResults.classList.toggle("hidden", visible > 0);
+            }
+
+            // Semantic search via Edge Function
+            async function semanticSearch(query) {
+              if (!query.trim() || !supabaseUrl) {
+                // Revert to showing all cards
+                isSemanticMode = false;
+                cards.forEach((c) => { c.style.display = ""; c.style.opacity = "1"; });
+                if (noResults) noResults.classList.add("hidden");
+                return;
+              }
+
+              isSemanticMode = true;
+              // Dim existing cards while searching
+              cards.forEach((c) => { c.style.opacity = "0.4"; });
+
+              try {
+                const res = await fetch(supabaseUrl + "/functions/v1/semantic-search", {
+                  method: "POST",
+                  headers: { "Content-Type": "application/json" },
+                  body: JSON.stringify({ query, chapter_id: chapterId }),
+                });
+
+                if (!res.ok) {
+                  isSemanticMode = false;
+                  filterCards();
+                  return;
+                }
+
+                const data = await res.json();
+                const matchIds = new Set((data.coaches || []).map((c) => c.id));
+
+                if (matchIds.size === 0) {
+                  cards.forEach((c) => { c.style.display = "none"; });
+                  if (noResults) noResults.classList.remove("hidden");
+                } else {
+                  cards.forEach((card) => {
+                    // Match by checking if card href contains the coach id
+                    const link = card.querySelector("a[href*='/coaches/']");
+                    const href = link?.getAttribute("href") || "";
+                    const cardId = card.dataset.coachId || "";
+                    const visible = matchIds.has(cardId);
+                    card.style.display = visible ? "" : "none";
+                    card.style.opacity = "1";
+                  });
+                  if (noResults) noResults.classList.add("hidden");
+                }
+              } catch {
+                isSemanticMode = false;
+                filterCards();
+              }
+            }
+
+            search?.addEventListener("input", (e) => {
+              const val = e.target.value;
+              // Use local filter for very short queries, semantic for longer
+              if (val.length < 3) {
+                isSemanticMode = false;
+                filterCards();
+                return;
+              }
+              if (debounceTimer) clearTimeout(debounceTimer);
+              debounceTimer = setTimeout(() => semanticSearch(val), 600);
+            });
+            certFilter?.addEventListener("change", filterCards);
+            langFilter?.addEventListener("change", filterCards);
+          </script>
+        </>
+      ) : (
+        <div class="text-center py-20">
+          <div class="w-16 h-16 mx-auto mb-4 rounded-2xl flex items-center justify-center" style="background:var(--color-brand-primary-light)">
+            <svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" class="text-brand-primary"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
+          </div>
+          <h3 class="text-lg font-semibold font-heading mb-2">No coaches listed yet</h3>
+          <p class="text-sm text-text-secondary max-w-sm mx-auto">Check back soon as our team grows.</p>
+        </div>
+      )}
+    </div>
+  </section>
+</BaseLayout>
