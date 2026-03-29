@@ -1,0 +1,126 @@
+---
+import BaseLayout from "@repo/template-core/layouts/BaseLayout.astro";
+import { getChapterData } from "@repo/template-core/lib/data";
+import { getBlock, getJsonBlock } from "@repo/template-core/lib/content";
+
+export async function getStaticPaths() {
+  const slug = import.meta.env.CHAPTER_SLUG;
+  const { chapter } = await getChapterData(slug);
+  return chapter.active_languages.map((lang: string) => ({
+    params: { locale: lang },
+  }));
+}
+
+const { locale } = Astro.params;
+const slug = import.meta.env.CHAPTER_SLUG;
+const { contentBlocks } = await getChapterData(slug, locale);
+
+const title = getBlock(contentBlocks, "resources_title", "Resources & Library");
+const description = getBlock(contentBlocks, "resources_description", "");
+
+interface ResourceItem {
+  title: string;
+  description?: string;
+  url: string;
+  type: "pdf" | "video" | "link" | "article";
+}
+
+const resources = getJsonBlock<ResourceItem[]>(contentBlocks, "resources_items") ?? [];
+
+const typeIcons: Record<string, { svg: string; color: string; bgColor: string }> = {
+  pdf: {
+    svg: '<path d="M14.5 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7.5L14.5 2z"/><polyline points="14 2 14 8 20 8"/>',
+    color: "#dc2626",
+    bgColor: "#dc26261a",
+  },
+  video: {
+    svg: '<circle cx="12" cy="12" r="10"/><polygon points="10 8 16 12 10 16 10 8"/>',
+    color: "#3b82f6",
+    bgColor: "#3b82f61a",
+  },
+  link: {
+    svg: '<path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><polyline points="15 3 21 3 21 9"/><line x1="10" x2="21" y1="14" y2="3"/>',
+    color: "var(--color-brand-primary)",
+    bgColor: "var(--color-brand-primary-light)",
+  },
+  article: {
+    svg: '<path d="M4 19.5v-15A2.5 2.5 0 0 1 6.5 2H20v20H6.5a2.5 2.5 0 0 1 0-5H20"/>',
+    color: "#d97706",
+    bgColor: "#d977061a",
+  },
+};
+---
+
+<BaseLayout title="Resources" locale={locale}>
+  {/* Page Hero */}
+  <section class="relative overflow-hidden py-16 md:py-24">
+    <div class="absolute inset-0" style="background: linear-gradient(135deg, var(--color-brand-primary-light) 0%, var(--color-warm-ivory) 60%, var(--color-brand-accent-light) 100%)"></div>
+    <div class="relative z-10 mx-auto max-w-[1200px] px-4 sm:px-6">
+      <div class="max-w-3xl">
+        <p class="overline text-brand-accent mb-3">Library</p>
+        <h1 class="text-4xl md:text-5xl lg:text-[3.5rem] font-bold font-heading tracking-tight" style="color:var(--color-brand-primary)">
+          {title}
+        </h1>
+        {description && (
+          <p class="text-lg text-text-secondary mt-4 max-w-xl">{description}</p>
+        )}
+      </div>
+    </div>
+    <div class="absolute bottom-0 left-0 right-0">
+      <svg viewBox="0 0 1440 48" preserveAspectRatio="none" class="w-full h-8 md:h-12" fill="var(--color-warm-ivory)">
+        <path d="M0,24 C360,48 1080,0 1440,28 L1440,48 L0,48 Z"/>
+      </svg>
+    </div>
+  </section>
+
+  <section class="py-12 md:py-16">
+    <div class="mx-auto max-w-[1200px] px-4 sm:px-6">
+      {resources.length > 0 ? (
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+          {resources.map((res) => {
+            const icon = typeIcons[res.type] || typeIcons.link;
+            return (
+              <a
+                href={res.url}
+                target="_blank"
+                rel="noopener noreferrer"
+                class="card-editorial group flex gap-4 p-5"
+              >
+                {/* Type icon */}
+                <div
+                  class="flex-shrink-0 flex items-center justify-center w-12 h-12 rounded-full"
+                  style={`background:${icon.bgColor};`}
+                >
+                  <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke={icon.color} stroke-width="2" stroke-linecap="round" stroke-linejoin="round" set:html={icon.svg} />
+                </div>
+
+                <div class="flex-1 min-w-0">
+                  <h3 class="font-semibold font-heading group-hover:text-brand-accent transition-colors">
+                    {res.title}
+                  </h3>
+                  {res.description && (
+                    <p class="mt-1 text-sm text-text-secondary line-clamp-2">
+                      {res.description}
+                    </p>
+                  )}
+                  <span class="mt-2 inline-flex items-center gap-1 text-sm font-medium text-brand-primary group-hover:text-brand-accent transition-colors">
+                    {res.type === "pdf" ? "Download" : "View"}
+                    <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14"/><path d="m12 5 7 7-7 7"/></svg>
+                  </span>
+                </div>
+              </a>
+            );
+          })}
+        </div>
+      ) : (
+        <div class="text-center py-20">
+          <div class="w-16 h-16 mx-auto mb-4 rounded-2xl flex items-center justify-center" style="background:var(--color-brand-primary-light)">
+            <svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" class="text-brand-primary"><path d="M4 19.5v-15A2.5 2.5 0 0 1 6.5 2H20v20H6.5a2.5 2.5 0 0 1 0-5H20"/></svg>
+          </div>
+          <h3 class="text-lg font-semibold font-heading mb-2">No resources yet</h3>
+          <p class="text-sm text-text-secondary max-w-sm mx-auto">Check back soon for documents, videos, and learning materials.</p>
+        </div>
+      )}
+    </div>
+  </section>
+</BaseLayout>
